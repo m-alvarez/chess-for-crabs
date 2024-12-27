@@ -19,7 +19,7 @@ impl Debug for Bitboard {
                 let square = Square::<Rel>::xy(x, y).unwrap();
                 let intersection = *self & Bitboard::at(square);
                 write!(fmt, "{}", intersection.popcnt())?;
-                write!(fmt, "{}", if y == 7 { "\n" } else { " " })?;
+                write!(fmt, "{}", if x == 7 { "\n" } else { " " })?;
             }
         }
         Ok(())
@@ -146,20 +146,16 @@ impl Bitboard {
 
     pub const fn union<const N: usize>(boards: [Bitboard; N]) -> Bitboard {
         let mut pattern: u64 = 0;
-        let mut i = 0;
-        while i < N {
+        const_for!(i in 0 .. N => {
             pattern = pattern | boards[i].0;
-            i += 1
-        }
+        });
         Bitboard(pattern)
     }
     pub const fn intersection<const N: usize>(boards: [Bitboard; N]) -> Bitboard {
         let mut pattern: u64 = !0;
-        let mut i = 0;
-        while i < N {
+        const_for!(i in 0 .. N => {
             pattern = pattern & boards[i].0;
-            i += 1
-        }
+        });
         Bitboard(pattern)
     }
 }

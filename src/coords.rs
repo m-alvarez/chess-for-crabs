@@ -111,3 +111,12 @@ impl Display for Line<Rel> {
         }
     }
 }
+
+pub const E: (i32, i32) = (1, 0);
+pub const NE: (i32, i32) = (1, 1);
+pub const N: (i32, i32) = (0, 1);
+pub const NW: (i32, i32) = (-1, 1);
+pub const W: (i32, i32) = (-1, 0);
+pub const SW: (i32, i32) = (-1, -1);
+pub const S: (i32, i32) = (0, -1);
+pub const SE: (i32, i32) = (1, -1);

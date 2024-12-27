@@ -29,8 +29,8 @@ impl Game {
         write!(w, "{}", board)
     }
 
-    pub fn parse_algebraic(&self, mv: &AlgebraicMove) -> Option<Move> {
-        self.board.parse_algebraic(self.player, mv)
+    pub fn validate_algebraic(&self, mv: &AlgebraicMove) -> Option<Move> {
+        self.board.validate_algebraic(self.player, mv)
     }
 
     pub fn make_move(&mut self, alg: &AlgebraicMove, mv: &Move) {

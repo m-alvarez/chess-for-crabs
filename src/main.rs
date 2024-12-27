@@ -1,6 +1,8 @@
 #![feature(portable_simd)]
 use std::io::{BufRead, Write};
 
+#[macro_use]
+mod utils;
 mod board;
 mod moves;
 mod bitboard;
@@ -33,7 +35,7 @@ fn main() {
             println!("Not a valid move: {}", buffer.trim());
             continue;
         };
-        let real_mv = if let Some(mv) = game.parse_algebraic(&mv) {
+        let real_mv = if let Some(mv) = game.validate_algebraic(&mv) {
             mv
         } else {
             println!("Move {} cannot be played", mv);

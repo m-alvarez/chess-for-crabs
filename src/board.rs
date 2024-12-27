@@ -1,7 +1,9 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
 
+use crate::utils::*;
 use crate::bitboard::Bitboard;
+use crate::coords::{Rel, Square};
 use crate::moves::{AlgebraicMove, Move};
 use crate::piece::{Color, Piece};
 use Color::*;
@@ -52,33 +54,50 @@ impl Board {
         new
     }
 
-    pub fn parse_algebraic(&self, player: Color, mv: &AlgebraicMove) -> Option<Move> {
+    pub fn linear_attackers<const N: usize>(&self, rays: &[Ray; N]) -> Bitboard {
+        let mut pattern = 0;
+        const_for!(i in 0 .. N => {
+            pattern |= lsb(rays[i].pos.0 & self[White].0);
+            pattern |= msb(rays[i].neg.0 & self[White].0)
+        });
+        println!("ATTACKERS:\n{:?}", Bitboard(pattern));
+        Bitboard(pattern)
+    }
+
+    pub fn attackers(&self, piece: Piece, target: Square<Rel>) -> Bitboard {
+        let potential_attackers = match piece {
+            Pawn => rev_pawn_moves(target) & self[White],
+            King => king_moves(target) & self[White],
+            Knight => knight_moves(target) & self[White],
+            Bishop => self.linear_attackers(&BISHOP_RAYS[target]),
+            Rook => self.linear_attackers(&ROOK_RAYS[target]),
+            Queen => self.linear_attackers(&QUEEN_RAYS[target]),
+        };
+        potential_attackers & self[piece]
+    }
+
+    // Beware: `White` is always the active player. The `player` variable only
+    // indicates how to convert between absolute and relative coordinates
+    pub fn validate_algebraic(&self, player: Color, mv: &AlgebraicMove) -> Option<Move> {
         let dst_rel = mv.dst_square.to_rel(player);
         let dst_bb = Bitboard::at(dst_rel);
-        let sources = match mv.piece {
-            Pawn => rev_pawn_moves(dst_rel),
-            Rook => rook_moves(dst_rel),
-            Bishop => bishop_moves(dst_rel),
-            Knight => knight_moves(dst_rel),
-            Queen => queen_moves(dst_rel),
-            King => king_moves(dst_rel),
+        if (dst_bb & self[White]).is_populated() {
+            return None
+        }
+        let attackers = self.attackers(mv.piece, dst_rel);
+        let attackers = match mv.src_square {
+            Some(l) => attackers & Bitboard::line(l.to_rel(player)),
+            None => attackers,
         };
-        let sources = sources & !dst_bb;
-        let sources = sources & self[White];
-        let sources = sources & self[mv.piece];
-        let sources = match mv.src_square {
-            Some(l) => sources & Bitboard::line(l.to_rel(player)),
-            None => sources
-        };
-        if sources.popcnt() != 1 {
+        if attackers.popcnt() != 1 {
             return None;
         }
-        let delete = dst_bb | sources;
+        let delete = dst_bb | attackers;
 
         Some(Move {
             piece: mv.piece,
             delete,
-            add: dst_bb
+            add: dst_bb,
         })
     }
 }
