@@ -21,6 +21,9 @@ impl Game {
     }
 
     pub fn display_board(&self, w: &mut impl std::io::Write) -> std::io::Result<()> {
+        if self.board.in_check(self.player) {
+            writeln!(w, "IN CHECK!")?;
+        }
         let board = if self.player == White {
             self.board
         } else {

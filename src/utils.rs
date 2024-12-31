@@ -15,9 +15,7 @@ macro_rules! const_for {
 }
 
 pub fn lsb(b: u64) -> u64 {
-    println!("Argument is {b:b}");
     let result = b & (Wrapping(!b) + Wrapping(1)).0;
-    println!("LSB is {:b}", result);
     result
 }
 
@@ -33,7 +31,5 @@ pub fn msb(b: u64) -> u64 {
             out("rcx") _,
         )
     }
-    println!("Argument is {b:b}");
-    println!("MSB is {:b}", result);
     result
 }

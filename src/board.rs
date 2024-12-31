@@ -1,11 +1,11 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
 
-use crate::utils::*;
 use crate::bitboard::Bitboard;
 use crate::coords::{Rel, Square};
 use crate::moves::{AlgebraicMove, Move};
 use crate::piece::{Color, Piece};
+use crate::utils::*;
 use Color::*;
 use Piece::*;
 
@@ -54,37 +54,57 @@ impl Board {
         new
     }
 
-    pub fn linear_attackers<const N: usize>(&self, rays: &[Ray; N]) -> Bitboard {
+    pub fn linear_attackers<const N: usize>(&self, player: Color, rays: &[Ray; N]) -> Bitboard {
+        let occupancy = (self[player] & self[player.opponent()]).0;
         let mut pattern = 0;
         const_for!(i in 0 .. N => {
-            pattern |= lsb(rays[i].pos.0 & self[White].0);
-            pattern |= msb(rays[i].neg.0 & self[White].0)
+            pattern |= lsb(rays[i].pos.0 & occupancy);
+            pattern |= msb(rays[i].neg.0 & occupancy);
         });
-        println!("ATTACKERS:\n{:?}", Bitboard(pattern));
         Bitboard(pattern)
     }
 
-    pub fn attackers(&self, piece: Piece, target: Square<Rel>) -> Bitboard {
+    pub fn move_piece_to(&self, piece: Piece, player: Color, target: Bitboard) -> Bitboard {
         let potential_attackers = match piece {
-            Pawn => rev_pawn_moves(target) & self[White],
-            King => king_moves(target) & self[White],
-            Knight => knight_moves(target) & self[White],
-            Bishop => self.linear_attackers(&BISHOP_RAYS[target]),
-            Rook => self.linear_attackers(&ROOK_RAYS[target]),
-            Queen => self.linear_attackers(&QUEEN_RAYS[target]),
+            // TODO: remove asymmetry of pawn moves
+            Pawn => return REV_PAWN_MOVES[White as usize][target] & self[Pawn] & self[White],
+            King => KING_ATTACKS[target],
+            Knight => KNIGHT_ATTACKS[target],
+            Bishop => self.linear_attackers(player, &BISHOP_RAYS[target]),
+            Rook => self.linear_attackers(player, &ROOK_RAYS[target]),
+            Queen => self.linear_attackers(player, &QUEEN_RAYS[target]),
         };
-        potential_attackers & self[piece]
+        potential_attackers & self[White] & self[piece]
     }
 
-    // Beware: `White` is always the active player. The `player` variable only
-    // indicates how to convert between absolute and relative coordinates
+    pub fn attack_piece_to(&self, piece: Piece, player: Color, target: Bitboard) -> Bitboard {
+        let potential_attackers = match piece {
+            // TODO: remove asymmetry of pawn moves
+            Pawn => REV_PAWN_ATTACKS[White as usize][target] & self[White],
+            King => KING_ATTACKS[target],
+            Knight => KNIGHT_ATTACKS[target],
+            Bishop => self.linear_attackers(player, &BISHOP_RAYS[target]),
+            Rook => self.linear_attackers(player, &ROOK_RAYS[target]),
+            Queen => self.linear_attackers(player, &QUEEN_RAYS[target]),
+        };
+        potential_attackers & self[player] & self[piece]
+    }
+
+    pub fn attack_to(&self, player: Color, target: Bitboard) -> Bitboard {
+        let mut pattern: Bitboard = Bitboard::empty();
+        for piece in Piece::list() {
+            pattern |= self.attack_piece_to(*piece, player, target);
+        }
+        pattern
+    }
+
     pub fn validate_algebraic(&self, player: Color, mv: &AlgebraicMove) -> Option<Move> {
         let dst_rel = mv.dst_square.to_rel(player);
         let dst_bb = Bitboard::at(dst_rel);
-        if (dst_bb & self[White]).is_populated() {
-            return None
+        if (dst_bb & self[player]).is_populated() {
+            return None;
         }
-        let attackers = self.attackers(mv.piece, dst_rel);
+        let attackers = self.move_piece_to(mv.piece, player, dst_bb);
         let attackers = match mv.src_square {
             Some(l) => attackers & Bitboard::line(l.to_rel(player)),
             None => attackers,
@@ -99,6 +119,13 @@ impl Board {
             delete,
             add: dst_bb,
         })
+    }
+
+    pub fn in_check(&self, player: Color) -> bool {
+        let king_bb = self[player] & self[King];
+        println!("{:?}", king_bb);
+        println!("{:?}", self.attack_to(player.opponent(), king_bb));
+        self.attack_to(player.opponent(), king_bb).is_populated()
     }
 }
 

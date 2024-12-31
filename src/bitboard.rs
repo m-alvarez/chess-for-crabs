@@ -95,6 +95,9 @@ impl Bitboard {
     pub const fn from_bytes(bytes: [u8; 8]) -> Bitboard {
         Bitboard(u64::from_le_bytes(bytes))
     }
+    pub const fn to_index(self) -> usize {
+        self.0.ilog2() as usize
+    }
     pub const fn initial_white(kind: Piece) -> Bitboard {
         Bitboard::from_bytes(match kind {
             Pawn => [0, 0, 0, 0, 0, 0, 0b11111111, 0],
