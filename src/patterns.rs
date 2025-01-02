@@ -63,9 +63,9 @@ const fn precompute_rays<const N: usize>(ds: [(i32, i32); N]) -> Raytable<N> {
     });
     Raytable::<N>(rays)
 }
-pub const BISHOP_RAYS: Raytable<2> = precompute_rays([NW, NE]);
-pub const ROOK_RAYS: Raytable<2> = precompute_rays([N, E]);
-pub const QUEEN_RAYS: Raytable<4> = precompute_rays([NW, N, NE, E]);
+pub const BISHOP_RAYS: Raytable<2> = precompute_rays([SE, SW]);
+pub const ROOK_RAYS: Raytable<2> = precompute_rays([S, E]);
+pub const QUEEN_RAYS: Raytable<4> = precompute_rays([SW, S, SE, E]);
 
 #[derive(Clone, Copy)]
 pub struct Attacktable([Bitboard; 64]);

@@ -15,6 +15,8 @@ mod coords;
 use moves::AlgebraicMove;
 use game::Game;
 
+use piece::Piece::*;
+
 fn main() {
     let stdin = std::io::stdin();
     let mut in_handle = stdin.lock();
@@ -25,6 +27,12 @@ fn main() {
     let mut game = Game::new();
     loop {
         game.display_board(&mut out).unwrap();
+        for color in piece::Color::list() {
+            if (game.board[King] & game.board[color.opponent()]).is_empty() {
+                println!("{color} wins!");
+                return
+            }
+        }
         buffer.clear();
         print!("> ");
         out.flush().unwrap();
@@ -35,7 +43,7 @@ fn main() {
             println!("Not a valid move: {}", buffer.trim());
             continue;
         };
-        let real_mv = if let Some(mv) = game.validate_algebraic(&mv) {
+        let real_mv = if let Some(mv) = game.is_pre_legal(&mv) {
             mv
         } else {
             println!("Move {} cannot be played", mv);

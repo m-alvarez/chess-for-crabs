@@ -44,7 +44,7 @@ impl Board {
     }
 
     pub fn linear_attackers<const N: usize>(&self, player: Color, rays: &[Ray; N]) -> Bitboard {
-        let occupancy = (self[player] & self[player.opponent()]).0;
+        let occupancy = (self[player] | self[player.opponent()]).0;
         let mut pattern = 0;
         for i in 0..N {
             pattern |= lsb(rays[i].pos.0 & occupancy);
@@ -60,10 +60,18 @@ impl Board {
             Knight => KNIGHT_ATTACKS[target],
             Bishop => self.linear_attackers(player, &BISHOP_RAYS[target]),
             Rook => self.linear_attackers(player, &ROOK_RAYS[target]),
-            Queen => self.linear_attackers(player, &QUEEN_RAYS[target]),
+            Queen => {
+                let occupancy = self[player] | self[player.opponent()];
+                for i in 0 .. 4 {
+                    println!("Ray {i}+\n{:?}", QUEEN_RAYS[target][i].pos & occupancy);
+                    println!("Ray {i}-\n{:?}", Bitboard(
+                            msb((QUEEN_RAYS[target][i].neg & occupancy).0)
+                            ));
+                }
+                self.linear_attackers(player, &QUEEN_RAYS[target])
+            },
         };
-        let filtered = potential_attackers & self[player] & self[piece];
-        filtered
+        potential_attackers & self[player] & self[piece]
     }
 
     pub fn attack_piece_to(&self, piece: Piece, player: Color, target: Bitboard) -> Bitboard {
@@ -87,9 +95,10 @@ impl Board {
         pattern
     }
 
-    pub fn validate_algebraic(&self, player: Color, mv: &AlgebraicMove) -> Option<Move> {
+    pub fn is_pre_legal(&self, player: Color, mv: &AlgebraicMove) -> Option<Move> {
         let dst_bb = Bitboard::at(mv.dst_square);
         if (dst_bb & self[player]).is_populated() {
+            println!("Populated");
             return None;
         }
         let attackers = self.move_piece_to(mv.piece, player, dst_bb);
@@ -98,6 +107,7 @@ impl Board {
             None => attackers,
         };
         if attackers.popcnt() != 1 {
+            println!("No attackers");
             return None;
         }
         let delete = dst_bb | attackers;
@@ -147,11 +157,13 @@ impl Display for Board {
             }
         }
         for i in (0..8).rev() {
+            write!(fmt, "{} ", i + 1)?;
             for j in 0..8 {
                 write!(fmt, "{}", chars[i * 8 + j])?;
                 write!(fmt, "{}", if j == 7 { "\n" } else { " " })?
             }
         }
+        write!(fmt, "  a b c d e f g h")?;
         Ok(())
     }
 }

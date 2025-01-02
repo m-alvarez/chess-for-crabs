@@ -24,11 +24,19 @@ impl Game {
         if self.board.in_check(self.player) {
             writeln!(w, "{} IN CHECK!", self.player)?;
         }
-        write!(w, "{}", self.board)
+        writeln!(w, "{}", self.board)
     }
 
-    pub fn validate_algebraic(&self, mv: &AlgebraicMove) -> Option<Move> {
-        self.board.validate_algebraic(self.player, mv)
+    pub fn is_pre_legal(&self, mv: &AlgebraicMove) -> Option<Move> {
+        self.board.is_pre_legal(self.player, mv)
+    }
+    pub fn is_legal(&self, mv: &AlgebraicMove) -> Option<Move> {
+        let mv = self.is_pre_legal(mv)?;
+        if self.board.apply(self.player, &mv).in_check(self.player) {
+            None
+        } else {
+            Some(mv)
+        }
     }
 
     pub fn make_move(&mut self, alg: &AlgebraicMove, mv: &Move) {
