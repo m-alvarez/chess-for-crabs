@@ -26,6 +26,7 @@ pub fn msb(b: u64) -> u64 {
         asm!(
             "lzcnt rcx, {b}",
             "shr {result}, cl",
+            "and {result}, {b}", // Haha
             b = in(reg) b,
             result = inout(reg) result,
             out("rcx") _,

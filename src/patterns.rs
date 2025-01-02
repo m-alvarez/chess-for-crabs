@@ -54,9 +54,10 @@ const fn precompute_rays<const N: usize>(ds: [(i32, i32); N]) -> Raytable<N> {
     const_for!(x in 0 .. 8 => {
         const_for!(y in 0 .. 8 => {
             const_for!(i in 0 .. N => {
+                let idx = (63 - x - y * 8) as usize;
                 let sq = Square { x: x as u8, y: y as u8 };
-                rays[x + 8*y][i].pos = ray(sq, ds[i]);
-                rays[x + 8*y][i].neg = ray(sq, (-ds[i].0, -ds[i].1));
+                rays[idx][i].pos = ray(sq, ds[i]);
+                rays[idx][i].neg = ray(sq, (-ds[i].0, -ds[i].1));
             });
         });
     });
@@ -69,32 +70,16 @@ pub const QUEEN_RAYS: Raytable<4> = precompute_rays([NW, N, NE, E]);
 #[derive(Clone, Copy)]
 pub struct Attacktable([Bitboard; 64]);
 impl Attacktable {
-    pub const fn attack(&self, pt: Bitboard) -> Bitboard {
-        self.0[pt.to_index()]
+    pub const fn attack(&self, pt: Bitboard) -> &Bitboard {
+        &self.0[pt.to_index()]
     }
 }
 impl Index<Bitboard> for Attacktable {
     type Output = Bitboard;
     fn index(&self, idx: Bitboard) -> &Self::Output {
-        &self.0[idx.to_index()]
+        &self.attack(idx)
     }
 }
-
-const fn precompute_ray_attacks<const N: usize>(attack_rays: &Raytable<N>) -> Attacktable {
-    let mut attacks = [Bitboard::empty(); 64];
-    const_for!(idx in 0 .. 64 => {
-        let mut pattern: u64 = 0;
-        const_for!(i in 0 .. N => {
-            pattern |= attack_rays.0[idx][i].pos.0;
-            pattern |= attack_rays.0[idx][i].neg.0;
-        });
-        attacks[idx] = Bitboard(pattern);
-    });
-    Attacktable(attacks)
-}
-pub const BISHOP_ATTACKS: Attacktable = precompute_ray_attacks(&BISHOP_RAYS);
-pub const ROOK_ATTACKS: Attacktable = precompute_ray_attacks(&ROOK_RAYS);
-pub const QUEEN_ATTACKS: Attacktable = precompute_ray_attacks(&QUEEN_RAYS);
 
 const KNIGHT_JUMPS: [(i32, i32); 8] = [
     (-1, -2),

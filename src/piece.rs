@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter, Result};
+
 #[derive(PartialEq, Eq, Copy, Clone)]
 pub enum Piece {
     Pawn = 0,
@@ -42,6 +44,19 @@ impl Piece {
     }
 }
 
+impl Display for Piece {
+    fn fmt(&self, fmt: &mut Formatter) -> Result {
+        match self {
+            Pawn => write!(fmt, "pawn"),
+            Knight => write!(fmt, "knight"),
+            Bishop => write!(fmt, "bishop"),
+            Rook => write!(fmt, "rook"),
+            Queen => write!(fmt, "queen"),
+            King => write!(fmt, "king"),
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Copy, Clone)]
 pub enum Color {
     Black = 0,
@@ -57,6 +72,15 @@ impl Color {
         match self {
             White => Black,
             Black => White,
+        }
+    }
+}
+
+impl Display for Color {
+    fn fmt(&self, fmt: &mut Formatter) -> Result {
+        match self {
+            White => write!(fmt, "white"),
+            Black => write!(fmt, "black"),
         }
     }
 }

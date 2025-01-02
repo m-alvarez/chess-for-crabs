@@ -22,7 +22,7 @@ impl Game {
 
     pub fn display_board(&self, w: &mut impl std::io::Write) -> std::io::Result<()> {
         if self.board.in_check(self.player) {
-            writeln!(w, "IN CHECK!")?;
+            writeln!(w, "{} IN CHECK!", self.player)?;
         }
         write!(w, "{}", self.board)
     }

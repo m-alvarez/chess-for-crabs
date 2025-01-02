@@ -43,29 +43,17 @@ impl Board {
         new
     }
 
-    pub fn flip(&self) -> Board {
-        let mut new = *self;
-        new[White] = self[Black];
-        new[Black] = self[White];
-        for bb in new.bitboards.iter_mut() {
-            *bb = bb.flip()
-        }
-        new
-    }
-
     pub fn linear_attackers<const N: usize>(&self, player: Color, rays: &[Ray; N]) -> Bitboard {
         let occupancy = (self[player] & self[player.opponent()]).0;
         let mut pattern = 0;
-        const_for!(i in 0 .. N => {
+        for i in 0..N {
             pattern |= lsb(rays[i].pos.0 & occupancy);
             pattern |= msb(rays[i].neg.0 & occupancy);
-        });
+        }
         Bitboard(pattern)
     }
 
     pub fn move_piece_to(&self, piece: Piece, player: Color, target: Bitboard) -> Bitboard {
-        println!("{:?}", REV_PAWN_MOVES[White as usize][target]);
-        println!("{:?}", REV_PAWN_MOVES[Black as usize][target]);
         let potential_attackers = match piece {
             Pawn => REV_PAWN_MOVES[player as usize][target],
             King => KING_ATTACKS[target],
@@ -74,7 +62,8 @@ impl Board {
             Rook => self.linear_attackers(player, &ROOK_RAYS[target]),
             Queen => self.linear_attackers(player, &QUEEN_RAYS[target]),
         };
-        potential_attackers & self[player] & self[piece]
+        let filtered = potential_attackers & self[player] & self[piece];
+        filtered
     }
 
     pub fn attack_piece_to(&self, piece: Piece, player: Color, target: Bitboard) -> Bitboard {
@@ -92,7 +81,8 @@ impl Board {
     pub fn attack_to(&self, player: Color, target: Bitboard) -> Bitboard {
         let mut pattern: Bitboard = Bitboard::empty();
         for piece in Piece::list() {
-            pattern |= self.attack_piece_to(*piece, player, target);
+            let bb = self.attack_piece_to(*piece, player, target);
+            pattern |= bb;
         }
         pattern
     }
@@ -121,7 +111,11 @@ impl Board {
 
     pub fn in_check(&self, player: Color) -> bool {
         let king_bb = self[player] & self[King];
-        self.attack_to(player.opponent(), king_bb).is_populated()
+        if king_bb.is_empty() {
+            return false;
+        }
+        let attackers = self.attack_to(player.opponent(), king_bb);
+        attackers.is_populated()
     }
 }
 
