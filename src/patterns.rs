@@ -1,16 +1,16 @@
 use crate::bitboard::Bitboard;
-use crate::coords::{Line, Rel, Square, E, N, NE, NW, S, SE, SW, W};
+use crate::coords::{Line, Square, E, N, NE, NW, S, SE, SW, W};
 use crate::piece::Color;
 use std::ops::Index;
 use Color::*;
 use Line::*;
 
-pub const fn ray(square: Square<Rel>, d: (i32, i32)) -> Bitboard {
+pub const fn ray(square: Square, d: (i32, i32)) -> Bitboard {
     let (dx, dy) = d;
     let mut pattern: u64 = 0;
     let mut x = square.x as i32 + dx;
     let mut y = square.y as i32 + dy;
-    while let Some(mv) = Square::<Rel>::xy(x, y) {
+    while let Some(mv) = Square::xy(x, y) {
         pattern |= Bitboard::at(mv).0;
         x += dx;
         y += dy;
@@ -18,7 +18,7 @@ pub const fn ray(square: Square<Rel>, d: (i32, i32)) -> Bitboard {
     Bitboard(pattern)
 }
 
-pub const fn rays<const N: usize>(square: Square<Rel>, ds: [(i32, i32); N]) -> Bitboard {
+pub const fn rays<const N: usize>(square: Square, ds: [(i32, i32); N]) -> Bitboard {
     let mut pattern = 0;
     const_for!(i in 0 .. N => {
         pattern |= ray(square, ds[i]).0
@@ -118,7 +118,7 @@ const fn precompute_jump_attacks<const N: usize>(d: &[(i32, i32); N]) -> Attackt
             let mut attack_pat: u64 = 0;
             const_for!(i in 0 .. N => {
                 let (dx, dy) = d[i];
-                if let Some(sq) = Square::<Rel>::xy(x+dx, y+dy) {
+                if let Some(sq) = Square::xy(x+dx, y+dy) {
                     attack_pat |= Bitboard::at(sq).0
                 }
             });

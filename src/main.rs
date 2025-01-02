@@ -24,7 +24,7 @@ fn main() {
     let mut buffer = String::new();
     let mut game = Game::new();
     loop {
-        game.display_board(&mut std::io::stdout().lock()).unwrap();
+        game.display_board(&mut out).unwrap();
         buffer.clear();
         print!("> ");
         out.flush().unwrap();

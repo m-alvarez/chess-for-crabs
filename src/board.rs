@@ -2,7 +2,6 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
 
 use crate::bitboard::Bitboard;
-use crate::coords::{Rel, Square};
 use crate::moves::{AlgebraicMove, Move};
 use crate::piece::{Color, Piece};
 use crate::utils::*;
@@ -32,14 +31,14 @@ impl Board {
         b
     }
 
-    pub fn apply(&self, mv: &Move) -> Board {
+    pub fn apply(&self, player: Color, mv: &Move) -> Board {
         // This will be SIMD eventually
         let mut new = *self;
         for bb in new.bitboards.iter_mut() {
             *bb &= !mv.delete
         }
         new[mv.piece] |= mv.add;
-        new[White] |= mv.add;
+        new[player] |= mv.add;
 
         new
     }
@@ -65,22 +64,22 @@ impl Board {
     }
 
     pub fn move_piece_to(&self, piece: Piece, player: Color, target: Bitboard) -> Bitboard {
+        println!("{:?}", REV_PAWN_MOVES[White as usize][target]);
+        println!("{:?}", REV_PAWN_MOVES[Black as usize][target]);
         let potential_attackers = match piece {
-            // TODO: remove asymmetry of pawn moves
-            Pawn => return REV_PAWN_MOVES[White as usize][target] & self[Pawn] & self[White],
+            Pawn => REV_PAWN_MOVES[player as usize][target],
             King => KING_ATTACKS[target],
             Knight => KNIGHT_ATTACKS[target],
             Bishop => self.linear_attackers(player, &BISHOP_RAYS[target]),
             Rook => self.linear_attackers(player, &ROOK_RAYS[target]),
             Queen => self.linear_attackers(player, &QUEEN_RAYS[target]),
         };
-        potential_attackers & self[White] & self[piece]
+        potential_attackers & self[player] & self[piece]
     }
 
     pub fn attack_piece_to(&self, piece: Piece, player: Color, target: Bitboard) -> Bitboard {
         let potential_attackers = match piece {
-            // TODO: remove asymmetry of pawn moves
-            Pawn => REV_PAWN_ATTACKS[White as usize][target] & self[White],
+            Pawn => REV_PAWN_ATTACKS[player as usize][target],
             King => KING_ATTACKS[target],
             Knight => KNIGHT_ATTACKS[target],
             Bishop => self.linear_attackers(player, &BISHOP_RAYS[target]),
@@ -99,14 +98,13 @@ impl Board {
     }
 
     pub fn validate_algebraic(&self, player: Color, mv: &AlgebraicMove) -> Option<Move> {
-        let dst_rel = mv.dst_square.to_rel(player);
-        let dst_bb = Bitboard::at(dst_rel);
+        let dst_bb = Bitboard::at(mv.dst_square);
         if (dst_bb & self[player]).is_populated() {
             return None;
         }
         let attackers = self.move_piece_to(mv.piece, player, dst_bb);
         let attackers = match mv.src_square {
-            Some(l) => attackers & Bitboard::line(l.to_rel(player)),
+            Some(l) => attackers & Bitboard::line(l),
             None => attackers,
         };
         if attackers.popcnt() != 1 {
@@ -123,8 +121,6 @@ impl Board {
 
     pub fn in_check(&self, player: Color) -> bool {
         let king_bb = self[player] & self[King];
-        println!("{:?}", king_bb);
-        println!("{:?}", self.attack_to(player.opponent(), king_bb));
         self.attack_to(player.opponent(), king_bb).is_populated()
     }
 }

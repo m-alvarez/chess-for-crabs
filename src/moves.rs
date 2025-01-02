@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use crate::bitboard::Bitboard;
-use crate::coords::{Abs, Line, Square};
+use crate::coords::{Line, Square};
 use crate::piece::Piece;
 use crate::piece::Piece::*;
 
@@ -16,8 +16,8 @@ pub struct Move {
 #[derive(Copy, Clone)]
 pub struct AlgebraicMove {
     pub piece: Piece,
-    pub src_square: Option<Line<Abs>>,
-    pub dst_square: Square<Abs>,
+    pub src_square: Option<Line>,
+    pub dst_square: Square,
     pub captures: bool,
     pub check: bool,
     pub checkmate: bool,
@@ -78,7 +78,7 @@ impl AlgebraicMove {
         // Consume dst
         match (chrs.next()??, chrs.next()??) {
             // remember it's backwards
-            (Rank(y), File(x)) => mv.dst_square = Square::<Abs>::xy(x, y).unwrap(),
+            (Rank(y), File(x)) => mv.dst_square = Square::xy(x, y).unwrap(),
             _ => return None,
         }
         // Consume capture mark

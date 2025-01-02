@@ -24,12 +24,7 @@ impl Game {
         if self.board.in_check(self.player) {
             writeln!(w, "IN CHECK!")?;
         }
-        let board = if self.player == White {
-            self.board
-        } else {
-            self.board.flip()
-        };
-        write!(w, "{}", board)
+        write!(w, "{}", self.board)
     }
 
     pub fn validate_algebraic(&self, mv: &AlgebraicMove) -> Option<Move> {
@@ -38,7 +33,7 @@ impl Game {
 
     pub fn make_move(&mut self, alg: &AlgebraicMove, mv: &Move) {
         self.log.append(*alg);
-        self.board = self.board.apply(mv).flip();
+        self.board = self.board.apply(self.player, mv);
         self.player = self.player.opponent();
     }
 }

@@ -4,7 +4,7 @@ use std::ops::{BitAndAssign, BitOrAssign, BitXorAssign};
 
 use std::arch::x86_64::_popcnt64;
 
-use crate::coords::{Square, Line, Rel};
+use crate::coords::{Square, Line};
 use crate::piece::{Color, Piece};
 use Color::*;
 use Piece::*;
@@ -16,7 +16,7 @@ impl Debug for Bitboard {
     fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {
         for y in (0..8).rev() {
             for x in 0..8 {
-                let square = Square::<Rel>::xy(x, y).unwrap();
+                let square = Square::xy(x, y).unwrap();
                 let intersection = *self & Bitboard::at(square);
                 write!(fmt, "{}", intersection.popcnt())?;
                 write!(fmt, "{}", if x == 7 { "\n" } else { " " })?;
@@ -136,11 +136,11 @@ impl Bitboard {
         unsafe { _popcnt64(self.0 as i64) }
     }
 
-    pub const fn at(point: Square<Rel>) -> Bitboard {
+    pub const fn at(point: Square) -> Bitboard {
         Bitboard(1 << (63 - point.x - point.y * 8))
     }
 
-    pub const fn line(l: Line<Rel>) -> Bitboard {
+    pub const fn line(l: Line) -> Bitboard {
         match l {
             Line::AtX(x) => LINE_AT_X[x as usize],
             Line::AtY(y) => LINE_AT_Y[y as usize],
