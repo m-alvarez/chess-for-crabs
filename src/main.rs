@@ -59,10 +59,15 @@ fn main() {
 
     let mut game = match option {
         1 => Game::new(),
-        2 => try_read(&mut buffer, |s| fen::parse(s).ok_or("Invalid FEN")).unwrap(),
+        2 => {
+            println!("Input FEN");
+            try_read(&mut buffer, |s| fen::parse(s).ok_or("Invalid FEN")).unwrap()
+        },
         _ => unreachable!(),
     };
     loop {
+        fen::serialize(&mut out, &game).unwrap();
+        writeln!(&mut out, "").unwrap();
         game.display_board(&mut out).unwrap();
         for color in piece::Color::list() {
             if (game.board[King] & game.board[color.opponent()]).is_empty() {

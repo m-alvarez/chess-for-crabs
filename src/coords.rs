@@ -16,6 +16,10 @@ impl Square {
             })
         }
     }
+    pub const fn algebraic(file: char, rank: u8) -> Option<Square> {
+        let file = file as i32 - 'a' as i32;
+        Square::xy(file, rank as i32)
+    }
 }
 impl Display for Square {
     fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {
