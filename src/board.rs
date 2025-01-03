@@ -74,7 +74,7 @@ impl Board {
         potential_attackers & self[player] & self[piece]
     }
 
-    pub fn attack_piece_to(&self, piece: Piece, player: Color, target: Bitboard) -> Bitboard {
+    pub fn capture_piece_to(&self, piece: Piece, player: Color, target: Bitboard) -> Bitboard {
         let potential_attackers = match piece {
             Pawn => REV_PAWN_ATTACKS[player as usize][target],
             King => KING_ATTACKS[target],
@@ -86,10 +86,10 @@ impl Board {
         potential_attackers & self[player] & self[piece]
     }
 
-    pub fn attack_to(&self, player: Color, target: Bitboard) -> Bitboard {
+    pub fn capture_to(&self, player: Color, target: Bitboard) -> Bitboard {
         let mut pattern: Bitboard = Bitboard::empty();
         for piece in Piece::list() {
-            let bb = self.attack_piece_to(*piece, player, target);
+            let bb = self.capture_piece_to(*piece, player, target);
             pattern |= bb;
         }
         pattern
@@ -98,16 +98,22 @@ impl Board {
     pub fn is_pre_legal(&self, player: Color, mv: &AlgebraicMove) -> Option<Move> {
         let dst_bb = Bitboard::at(mv.dst_square);
         if (dst_bb & self[player]).is_populated() {
-            println!("Populated");
-            return None;
+            return None
         }
-        let attackers = self.move_piece_to(mv.piece, player, dst_bb);
+        let does_capture = (dst_bb & self[player.opponent()]).is_populated();
+        if does_capture != mv.captures {
+            return None
+        }
+        let attackers = if mv.captures {
+            self.capture_piece_to(mv.piece, player, dst_bb)
+        } else {
+            self.move_piece_to(mv.piece, player, dst_bb)
+        };
         let attackers = match mv.src_square {
             Some(l) => attackers & Bitboard::line(l),
             None => attackers,
         };
         if attackers.popcnt() != 1 {
-            println!("No attackers");
             return None;
         }
         let delete = dst_bb | attackers;
@@ -124,7 +130,7 @@ impl Board {
         if king_bb.is_empty() {
             return false;
         }
-        let attackers = self.attack_to(player.opponent(), king_bb);
+        let attackers = self.capture_to(player.opponent(), king_bb);
         attackers.is_populated()
     }
 }

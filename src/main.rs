@@ -40,7 +40,7 @@ fn main() {
         let mv = if let Some(mv) = AlgebraicMove::parse(buffer.trim()) {
             mv
         } else {
-            println!("Not a valid move: {}", buffer.trim());
+            println!("I cannot parse {}", buffer.trim());
             continue;
         };
         let real_mv = if let Some(mv) = game.is_pre_legal(&mv) {

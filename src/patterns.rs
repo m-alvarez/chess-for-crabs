@@ -119,6 +119,27 @@ pub const REV_PAWN_ATTACKS: [Attacktable; 2] = precompute_rev_pawn_attacks();
 
 const fn precompute_rev_pawn_attacks() -> [Attacktable; 2] {
     let mut rev_attacks = [Attacktable([Bitboard::empty(); 64]); 2];
+    const_for!(x in 0 .. 8 => {
+        const_for!(y in 0 .. 8 => {
+            let idx = (63 - x - y * 8) as u64;
+            let mut white_pat = 0;
+            if let Some(square) = Square::xy(x-1, y-1) {
+                white_pat |= Bitboard::at(square).0;
+            }
+            if let Some(square) = Square::xy(x+1, y-1) {
+                white_pat |= Bitboard::at(square).0;
+            }
+            rev_attacks[White as usize].0[idx as usize] = Bitboard(white_pat);
+            let mut black_pat = 0;
+            if let Some(square) = Square::xy(x-1, y+1) {
+                black_pat |= Bitboard::at(square).0
+            }
+            if let Some(square) = Square::xy(x+1, y+1) {
+                black_pat |= Bitboard::at(square).0;
+            }
+            rev_attacks[Black as usize].0[idx as usize] = Bitboard(black_pat);
+        });
+    });
     rev_attacks
 }
 
