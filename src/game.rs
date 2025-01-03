@@ -30,6 +30,7 @@ impl Game {
     pub fn is_pre_legal(&self, mv: &AlgebraicMove) -> Option<Move> {
         self.board.is_pre_legal(self.player, mv)
     }
+
     pub fn is_legal(&self, mv: &AlgebraicMove) -> Option<Move> {
         let mv = self.is_pre_legal(mv)?;
         if self.board.apply(self.player, &mv).in_check(self.player) {

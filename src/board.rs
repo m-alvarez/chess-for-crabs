@@ -31,6 +31,12 @@ impl Board {
         b
     }
 
+    pub fn empty() -> Board {
+        Board {
+            bitboards: [Bitboard::empty(); 8],
+        }
+    }
+
     pub fn apply(&self, player: Color, mv: &Move) -> Board {
         // This will be SIMD eventually
         let mut new = *self;
