@@ -1,11 +1,11 @@
 use crate::bitboard::Bitboard;
 use crate::board::Board;
+use crate::game::Game;
 use crate::coords::Square;
 use crate::move_log::MoveLog;
 use crate::piece::Color::*;
 use crate::piece::Piece::*;
 use crate::piece::{Color, Piece};
-use crate::Game;
 use std::io::{Result, Write};
 
 fn char_piece(c: char) -> Option<Piece> {
@@ -97,26 +97,23 @@ fn read_en_passant(s: &str) -> Option<u8> {
 
 pub fn parse(s: &str) -> Option<Game> {
     let mut segments = s.split_whitespace();
-    let board = read_fen_board(segments.next()?)?;
-    let player = match segments.next()? {
+    let mut board = read_fen_board(segments.next()?)?;
+    board.player = match segments.next()? {
         "w" => White,
         "b" => Black,
         _ => return None,
     };
-    let castling = read_castling_rights(segments.next()?)?;
-    let en_passant = read_en_passant(segments.next()?)?;
-    let _hm = str::parse::<i64>(segments.next()?).ok()?;
+    board.castling_rights = read_castling_rights(segments.next()?)?;
+    board.en_passant = read_en_passant(segments.next()?)?;
+    board.half_moves = str::parse::<u8>(segments.next()?).ok()?;
     let fm = str::parse::<i64>(segments.next()?).ok()?;
 
     let log = MoveLog {
-        ply: fm * 2 + if player == Black { 1 } else { 0 },
+        ply: fm * 2 + if board.player == Black { 1 } else { 0 },
         moves: Vec::new(),
     };
     Some(Game {
-        castling,
-        en_passant,
         board,
-        player,
         log,
     })
 }
@@ -149,11 +146,12 @@ fn serialize_board(out: &mut impl Write, b: &Board) -> Result<()> {
                 Black
             } else {
                 empty_spaces += 1;
-                continue
+                continue;
             };
-            let piece = *Piece::list().iter().find(|pc| {
-                (square & b[**pc]).is_populated()
-            }).unwrap();
+            let piece = *Piece::list()
+                .iter()
+                .find(|pc| (square & b[**pc]).is_populated())
+                .unwrap();
             if empty_spaces > 0 {
                 write!(out, "{}", empty_spaces)?;
                 empty_spaces = 0
@@ -163,7 +161,9 @@ fn serialize_board(out: &mut impl Write, b: &Board) -> Result<()> {
         if empty_spaces > 0 {
             write!(out, "{}", empty_spaces)?;
         }
-        if y > 0 { write!(out, "/")? }
+        if y > 0 {
+            write!(out, "/")?
+        }
     }
     Ok(())
 }
@@ -179,28 +179,28 @@ fn serialize_player(out: &mut impl Write, c: Color) -> Result<()> {
     )
 }
 
-fn serialize_castling_rights(out: &mut impl Write, game: &Game) -> Result<()> {
-    if game.can_castle_kingside(White) {
+fn serialize_castling_rights(out: &mut impl Write, board: &Board) -> Result<()> {
+    if board.kingside_castling_allowed(White) {
         write_piece(out, White, King)?;
     }
-    if game.can_castle_queenside(White) {
+    if board.queenside_castling_allowed(White) {
         write_piece(out, White, Queen)?;
     }
-    if game.can_castle_kingside(Black) {
+    if board.kingside_castling_allowed(Black) {
         write_piece(out, Black, King)?;
     }
-    if game.can_castle_queenside(Black) {
+    if board.queenside_castling_allowed(Black) {
         write_piece(out, Black, Queen)?;
     }
     Ok(())
 }
 
-fn serialize_en_passant(out: &mut impl Write, game: &Game) -> Result<()> {
-    if game.en_passant == 0 {
+fn serialize_en_passant(out: &mut impl Write, board: &Board) -> Result<()> {
+    if board.en_passant == 0 {
         write!(out, "-")
     } else {
-        let file = (8 - game.en_passant.ilog2() + 'a' as u32) as u8 as char;
-        let rank = match game.player {
+        let file = (8 - board.en_passant.ilog2() + 'a' as u32) as u8 as char;
+        let rank = match board.player {
             White => 6,
             Black => 3,
         };
@@ -208,13 +208,13 @@ fn serialize_en_passant(out: &mut impl Write, game: &Game) -> Result<()> {
     }
 }
 
-pub fn serialize(out: &mut impl Write, game: &Game) -> Result<()> {
-    serialize_board(out, &game.board)?;
+pub fn serialize(out: &mut impl Write, board: &Board) -> Result<()> {
+    serialize_board(out, &board)?;
     write!(out, " ")?;
-    serialize_player(out, game.player)?;
+    serialize_player(out, board.player)?;
     write!(out, " ")?;
-    serialize_castling_rights(out, game)?;
+    serialize_castling_rights(out, board)?;
     write!(out, " ")?;
-    serialize_en_passant(out, game)?;
-    write!(out, " 0 {}", 1 + game.log.ply / 2) // TODO: serialize half-moves
+    serialize_en_passant(out, board)?;
+    write!(out, " {} 0", board.half_moves) // TODO: serialize half-moves
 }

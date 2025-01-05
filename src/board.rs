@@ -13,13 +13,21 @@ use crate::patterns::*;
 #[derive(Copy, Clone)]
 pub struct Board {
     // First two entries are color boards, then piece boards
-    bitboards: [Bitboard; 8],
+    pub bitboards: [Bitboard; 8],
+    pub player: Color,
+    pub half_moves: u8,
+    pub castling_rights: u8,
+    pub en_passant: u8,
 }
 
 impl Board {
     pub fn initial() -> Board {
         let mut b = Board {
             bitboards: [Bitboard::empty(); 8],
+            player: White,
+            half_moves: 0,
+            castling_rights: 0b1111,
+            en_passant: 0,
         };
         for color in Color::list() {
             for piece in Piece::list() {
@@ -34,17 +42,22 @@ impl Board {
     pub fn empty() -> Board {
         Board {
             bitboards: [Bitboard::empty(); 8],
+            player: White,
+            half_moves: 0,
+            castling_rights: 0,
+            en_passant: 0,
         }
     }
 
-    pub fn apply(&self, player: Color, mv: &Move) -> Board {
+    pub fn apply(&self, mv: &Move) -> Board {
         // This will be SIMD eventually
         let mut new = *self;
         for bb in new.bitboards.iter_mut() {
             *bb &= !mv.delete
         }
         new[mv.piece] |= mv.add;
-        new[player] |= mv.add;
+        new[self.player] |= mv.add;
+        new.player = self.player.opponent();
 
         new
     }
@@ -68,14 +81,15 @@ impl Board {
             Rook => self.linear_attackers(player, &ROOK_RAYS[target]),
             Queen => {
                 let occupancy = self[player] | self[player.opponent()];
-                for i in 0 .. 4 {
+                for i in 0..4 {
                     println!("Ray {i}+\n{:?}", QUEEN_RAYS[target][i].pos & occupancy);
-                    println!("Ray {i}-\n{:?}", Bitboard(
-                            msb((QUEEN_RAYS[target][i].neg & occupancy).0)
-                            ));
+                    println!(
+                        "Ray {i}-\n{:?}",
+                        Bitboard(msb((QUEEN_RAYS[target][i].neg & occupancy).0))
+                    );
                 }
                 self.linear_attackers(player, &QUEEN_RAYS[target])
-            },
+            }
         };
         potential_attackers & self[player] & self[piece]
     }
@@ -101,19 +115,19 @@ impl Board {
         pattern
     }
 
-    pub fn is_pre_legal(&self, player: Color, mv: &AlgebraicMove) -> Option<Move> {
+    pub fn is_pre_legal(&self, mv: &AlgebraicMove) -> Option<Move> {
         let dst_bb = Bitboard::at(mv.dst_square);
-        if (dst_bb & self[player]).is_populated() {
-            return None
+        if (dst_bb & self[self.player]).is_populated() {
+            return None;
         }
-        let does_capture = (dst_bb & self[player.opponent()]).is_populated();
+        let does_capture = (dst_bb & self[self.player.opponent()]).is_populated();
         if does_capture != mv.captures {
-            return None
+            return None;
         }
         let attackers = if mv.captures {
-            self.capture_piece_to(mv.piece, player, dst_bb)
+            self.capture_piece_to(mv.piece, self.player, dst_bb)
         } else {
-            self.move_piece_to(mv.piece, player, dst_bb)
+            self.move_piece_to(mv.piece, self.player, dst_bb)
         };
         let attackers = match mv.src_square {
             Some(l) => attackers & Bitboard::line(l),
@@ -131,13 +145,46 @@ impl Board {
         })
     }
 
-    pub fn in_check(&self, player: Color) -> bool {
-        let king_bb = self[player] & self[King];
+    pub fn is_legal(&self, mv: &AlgebraicMove) -> Option<Move> {
+        let mv = self.is_pre_legal(mv)?;
+        if self.apply(&mv).in_check() {
+            None
+        } else {
+            Some(mv)
+        }
+    }
+
+    pub fn in_check(&self) -> bool {
+        let king_bb = self[self.player] & self[King];
         if king_bb.is_empty() {
             return false;
         }
-        let attackers = self.capture_to(player.opponent(), king_bb);
+        let attackers = self.capture_to(self.player.opponent(), king_bb);
         attackers.is_populated()
+    }
+
+    pub fn kingside_castling_allowed(&self, color: Color) -> bool {
+        // Can be done jump-free if need be
+        0 != self.castling_rights
+            & match color {
+                White => 0b1000,
+                Black => 0b0010,
+            }
+    }
+
+    pub fn queenside_castling_allowed(&self, color: Color) -> bool {
+        0 != self.castling_rights
+            & match color {
+                White => 0b0100,
+                Black => 0b0001,
+            }
+    }
+
+    pub fn display(&self, w: &mut impl std::io::Write) -> std::io::Result<()> {
+        if self.in_check() {
+            writeln!(w, "Player {} is in check!", self.player)?;
+        }
+        writeln!(w, "{}", self)
     }
 }
 

@@ -66,9 +66,9 @@ fn main() {
         _ => unreachable!(),
     };
     loop {
-        fen::serialize(&mut out, &game).unwrap();
+        fen::serialize(&mut out, &game.board).unwrap();
         writeln!(&mut out, "").unwrap();
-        game.display_board(&mut out).unwrap();
+        game.board.display(&mut out).unwrap();
         for color in piece::Color::list() {
             if (game.board[King] & game.board[color.opponent()]).is_empty() {
                 println!("{color} wins!");
@@ -81,7 +81,7 @@ fn main() {
             } else {
                 return Err("I cannot parse that");
             };
-            let mv = if let Some(mv) = game.is_pre_legal(&alg) {
+            let mv = if let Some(mv) = game.board.is_pre_legal(&alg) {
                 mv
             } else {
                 return Err("Illegal move");
