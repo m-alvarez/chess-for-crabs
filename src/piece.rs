@@ -74,6 +74,12 @@ impl Color {
             Black => White,
         }
     }
+    pub const fn advance_direction(self) -> i32 {
+        match self {
+            White => 1,
+            Black => -1,
+        }
+    }
 }
 
 impl Display for Color {

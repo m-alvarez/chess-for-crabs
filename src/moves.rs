@@ -78,7 +78,7 @@ impl AlgebraicMove {
         // Consume dst
         match (chrs.next()??, chrs.next()??) {
             // remember it's backwards
-            (Rank(y), File(x)) => mv.dst_square = Square::xy(x, y).unwrap(),
+            (Rank(y), File(x)) => mv.dst_square = Square::xy(x, y),
             _ => return None,
         }
         // Consume capture mark

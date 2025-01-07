@@ -8,7 +8,21 @@ macro_rules! const_for {
             let mut $var = $range.start;
             while $var < $range.end {
                 $body
-                $var += 1
+                $var = $var + 1
+            }
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! const_foreach {
+    ($var:pat in $arr:expr => $body:stmt) => {
+        {
+            let mut i = 0;
+            while i < $arr.len() {
+                let $var = $arr[i];
+                i += 1;
+                $body
             }
         }
     }

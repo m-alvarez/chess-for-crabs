@@ -6,7 +6,7 @@ pub struct Square {
     pub y: u8,
 }
 impl Square {
-    pub const fn xy(x: i32, y: i32) -> Option<Square> {
+    pub const fn xy_checked(x: i32, y: i32) -> Option<Square> {
         if x < 0 || y < 0 || x >= 8 || y >= 8 {
             None
         } else {
@@ -16,9 +16,21 @@ impl Square {
             })
         }
     }
+
+    pub const fn xy(x: i32, y: i32) -> Square {
+        Square {
+            x: x as u8,
+            y: y as u8,
+        }
+    }
+
     pub const fn algebraic(file: char, rank: u8) -> Option<Square> {
         let file = file as i32 - 'a' as i32;
-        Square::xy(file, rank as i32)
+        Square::xy_checked(file, rank as i32)
+    }
+
+    pub const fn index(self) -> u64 {
+        (63 - self.x - self.y * 8) as u64
     }
 }
 impl Display for Square {

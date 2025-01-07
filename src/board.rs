@@ -58,7 +58,11 @@ impl Board {
         new[mv.piece] |= mv.add;
         new[self.player] |= mv.add;
         new.player = self.player.opponent();
-
+        let new_pawn = new[Pawn] & !self[Pawn];
+        new.en_passant = match self.player {
+            Black => (((new_pawn.0 >> 16) & mv.delete.0) >> 8) as u8,
+            White => (((new_pawn.0 << 16) & mv.delete.0) >> 48) as u8,
+        };
         new
     }
 
@@ -79,24 +83,18 @@ impl Board {
             Knight => KNIGHT_ATTACKS[target],
             Bishop => self.linear_attackers(player, &BISHOP_RAYS[target]),
             Rook => self.linear_attackers(player, &ROOK_RAYS[target]),
-            Queen => {
-                let occupancy = self[player] | self[player.opponent()];
-                for i in 0..4 {
-                    println!("Ray {i}+\n{:?}", QUEEN_RAYS[target][i].pos & occupancy);
-                    println!(
-                        "Ray {i}-\n{:?}",
-                        Bitboard(msb((QUEEN_RAYS[target][i].neg & occupancy).0))
-                    );
-                }
-                self.linear_attackers(player, &QUEEN_RAYS[target])
-            }
+            Queen => self.linear_attackers(player, &QUEEN_RAYS[target]),
         };
         potential_attackers & self[player] & self[piece]
     }
 
     pub fn capture_piece_to(&self, piece: Piece, player: Color, target: Bitboard) -> Bitboard {
         let potential_attackers = match piece {
-            Pawn => REV_PAWN_ATTACKS[player as usize][target],
+            Pawn => {
+                REV_PAWN_ATTACKS[player as usize][target]
+                    | REV_PAWN_EP_ATTACKS[player as usize]
+                        [(8 - self.en_passant.leading_zeros()) as usize][target]
+            }
             King => KING_ATTACKS[target],
             Knight => KNIGHT_ATTACKS[target],
             Bishop => self.linear_attackers(player, &BISHOP_RAYS[target]),
@@ -116,12 +114,10 @@ impl Board {
     }
 
     pub fn is_pre_legal(&self, mv: &AlgebraicMove) -> Option<Move> {
+        // This doesn't have to be fast, since the machine never generates AlgebraicMove
+        // objects
         let dst_bb = Bitboard::at(mv.dst_square);
         if (dst_bb & self[self.player]).is_populated() {
-            return None;
-        }
-        let does_capture = (dst_bb & self[self.player.opponent()]).is_populated();
-        if does_capture != mv.captures {
             return None;
         }
         let attackers = if mv.captures {
@@ -136,11 +132,25 @@ impl Board {
         if attackers.popcnt() != 1 {
             return None;
         }
-        let delete = dst_bb | attackers;
+
+        let captures = dst_bb & self[self.player.opponent()];
+        let captures = if mv.piece == Pawn && captures.is_empty() {
+            // En passant capture
+            (match self.player {
+                White => Bitboard(dst_bb.0 << 8),
+                Black => Bitboard(dst_bb.0 >> 8),
+            }) & self[self.player.opponent()]
+        } else {
+            captures
+        };
+
+        if captures.is_populated() != mv.captures {
+            return None;
+        }
 
         Some(Move {
             piece: mv.piece,
-            delete,
+            delete: captures | attackers,
             add: dst_bb,
         })
     }
@@ -197,10 +207,26 @@ impl Debug for Board {
         Ok(())
     }
 }
+
+const fn empty_chess_board() -> [&'static str; 8 * 8] {
+    let mut chars: [&'static str; 8 * 8] = ["_"; 8 * 8];
+    const_for!(i in 0 .. 8 * 8 => {
+        /*
+        chars[i] = if (i % 8 + i / 8) % 2 == 1 {
+            "■"
+        } else {
+            "□"
+        }
+        */
+        chars[i] = "_"
+    });
+    chars
+}
+
 impl Display for Board {
     // This is slow, it doesn't have to be fast.
     fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {
-        let mut chars: [&'static str; 8 * 8] = ["_"; 8 * 8];
+        let mut chars: [&'static str; 8 * 8] = empty_chess_board();
         for bit in 0..64 {
             let num: u64 = 1 << 63 - bit;
             let mask = Bitboard(num);

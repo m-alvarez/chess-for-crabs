@@ -1,7 +1,7 @@
 use crate::bitboard::Bitboard;
 use crate::board::Board;
-use crate::game::Game;
 use crate::coords::Square;
+use crate::game::Game;
 use crate::move_log::MoveLog;
 use crate::piece::Color::*;
 use crate::piece::Piece::*;
@@ -33,14 +33,10 @@ fn char_color(c: char) -> Option<Color> {
 fn read_fen_board(s: &str) -> Option<Board> {
     let mut board = Board::empty();
 
-    println!("The board is [{s}]");
-
     let mut i = 0;
     for chr in s.chars() {
-        println!("{i}: {chr}");
         if i % 9 == 8 {
             if chr != '/' {
-                println!("Expected slash, got {chr}");
                 return None;
             }
             i += 1
@@ -48,7 +44,6 @@ fn read_fen_board(s: &str) -> Option<Board> {
             if skip > 0 && skip <= 8 {
                 i += skip;
             } else {
-                println!("Bad skip");
                 return None;
             }
         } else {
@@ -56,7 +51,7 @@ fn read_fen_board(s: &str) -> Option<Board> {
             let y = 7 - i / 9;
             let piece = char_piece(chr)?;
             let color = char_color(chr)?;
-            let bb = Bitboard::at(Square::xy(x as i32, y as i32)?);
+            let bb = Bitboard::at(Square::xy_checked(x as i32, y as i32)?);
             board[piece] |= bb;
             board[color] |= bb;
             i += 1
@@ -92,7 +87,7 @@ fn read_en_passant(s: &str) -> Option<u8> {
     let file = chars.next()?;
     let rank = chars.next()?;
     let sq = Square::algebraic(file, rank.to_digit(10)? as u8)?;
-    Some(sq.x)
+    Some(1 << sq.x)
 }
 
 pub fn parse(s: &str) -> Option<Game> {
@@ -112,10 +107,7 @@ pub fn parse(s: &str) -> Option<Game> {
         ply: fm * 2 + if board.player == Black { 1 } else { 0 },
         moves: Vec::new(),
     };
-    Some(Game {
-        board,
-        log,
-    })
+    Some(Game { board, log })
 }
 
 fn write_piece(out: &mut impl Write, color: Color, piece: Piece) -> Result<()> {
@@ -139,7 +131,7 @@ fn serialize_board(out: &mut impl Write, b: &Board) -> Result<()> {
     for y in (0..8).rev() {
         let mut empty_spaces = 0;
         for x in 0..8 {
-            let square = Bitboard::at(Square::xy(x, y).unwrap());
+            let square = Bitboard::at(Square::xy(x, y));
             let color = if (square & b[White]).is_populated() {
                 White
             } else if (square & b[Black]).is_populated() {
@@ -199,7 +191,7 @@ fn serialize_en_passant(out: &mut impl Write, board: &Board) -> Result<()> {
     if board.en_passant == 0 {
         write!(out, "-")
     } else {
-        let file = (8 - board.en_passant.ilog2() + 'a' as u32) as u8 as char;
+        let file = (board.en_passant.leading_zeros() + 'a' as u32) as u8 as char;
         let rank = match board.player {
             White => 6,
             Black => 3,

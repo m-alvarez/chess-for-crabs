@@ -10,7 +10,7 @@ pub const fn ray(square: Square, d: (i32, i32)) -> Bitboard {
     let mut pattern: u64 = 0;
     let mut x = square.x as i32 + dx;
     let mut y = square.y as i32 + dy;
-    while let Some(mv) = Square::xy(x, y) {
+    while let Some(mv) = Square::xy_checked(x, y) {
         pattern |= Bitboard::at(mv).0;
         x += dx;
         y += dy;
@@ -103,7 +103,7 @@ const fn precompute_jump_attacks<const N: usize>(d: &[(i32, i32); N]) -> Attackt
             let mut attack_pat: u64 = 0;
             const_for!(i in 0 .. N => {
                 let (dx, dy) = d[i];
-                if let Some(sq) = Square::xy(x+dx, y+dy) {
+                if let Some(sq) = Square::xy_checked(x+dx, y+dy) {
                     attack_pat |= Bitboard::at(sq).0
                 }
             });
@@ -116,25 +116,44 @@ const fn precompute_jump_attacks<const N: usize>(d: &[(i32, i32); N]) -> Attackt
 
 pub const REV_PAWN_MOVES: [Attacktable; 2] = precompute_rev_pawn_moves();
 pub const REV_PAWN_ATTACKS: [Attacktable; 2] = precompute_rev_pawn_attacks();
+pub const REV_PAWN_EP_ATTACKS: [[Attacktable; 9]; 2] = precompute_rev_pawn_ep_attacks();
+
+const fn precompute_rev_pawn_ep_attacks() -> [[Attacktable; 9]; 2] {
+    let mut rev_attacks = [[Attacktable([Bitboard::empty(); 64]); 9]; 2];
+    const_for!(x_target in 0 .. 8 => {
+        const_foreach!((color, y_target, dy) in [(White, 5, -1), (Black, 2, 1)] => {
+            let mut pat = 0;
+            if let Some(square) = Square::xy_checked(x_target-1, y_target + dy) {
+                pat |= Bitboard::at(square).0
+            }
+            if let Some(square) = Square::xy_checked(x_target+1, y_target + dy) {
+                pat |= Bitboard::at(square).0
+            }
+            let idx = Square::xy(x_target, y_target).index() as usize;
+            rev_attacks[color as usize][(x_target + 1) as usize].0[idx] = Bitboard(pat)
+        })
+    });
+    rev_attacks
+}
 
 const fn precompute_rev_pawn_attacks() -> [Attacktable; 2] {
     let mut rev_attacks = [Attacktable([Bitboard::empty(); 64]); 2];
     const_for!(x in 0 .. 8 => {
         const_for!(y in 0 .. 8 => {
-            let idx = (63 - x - y * 8) as u64;
+            let idx = Square::xy(x, y).index();
             let mut white_pat = 0;
-            if let Some(square) = Square::xy(x-1, y-1) {
+            if let Some(square) = Square::xy_checked(x-1, y-1) {
                 white_pat |= Bitboard::at(square).0;
             }
-            if let Some(square) = Square::xy(x+1, y-1) {
+            if let Some(square) = Square::xy_checked(x+1, y-1) {
                 white_pat |= Bitboard::at(square).0;
             }
             rev_attacks[White as usize].0[idx as usize] = Bitboard(white_pat);
             let mut black_pat = 0;
-            if let Some(square) = Square::xy(x-1, y+1) {
+            if let Some(square) = Square::xy_checked(x-1, y+1) {
                 black_pat |= Bitboard::at(square).0
             }
-            if let Some(square) = Square::xy(x+1, y+1) {
+            if let Some(square) = Square::xy_checked(x+1, y+1) {
                 black_pat |= Bitboard::at(square).0;
             }
             rev_attacks[Black as usize].0[idx as usize] = Bitboard(black_pat);

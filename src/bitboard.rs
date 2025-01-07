@@ -15,13 +15,15 @@ pub struct Bitboard(pub u64);
 impl Debug for Bitboard {
     fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {
         for y in (0..8).rev() {
+            write!(fmt, "{} ", y + 1)?;
             for x in 0..8 {
-                let square = Square::xy(x, y).unwrap();
+                let square = Square::xy(x, y);
                 let intersection = *self & Bitboard::at(square);
                 write!(fmt, "{}", intersection.popcnt())?;
                 write!(fmt, "{}", if x == 7 { "\n" } else { " " })?;
             }
         }
+        write!(fmt, "  a b c d e f g h")?;
         Ok(())
     }
 }
@@ -95,9 +97,11 @@ impl Bitboard {
     pub const fn from_bytes(bytes: [u8; 8]) -> Bitboard {
         Bitboard(u64::from_le_bytes(bytes))
     }
+
     pub const fn to_index(self) -> usize {
         self.0.ilog2() as usize
     }
+
     pub const fn initial_white(kind: Piece) -> Bitboard {
         Bitboard::from_bytes(match kind {
             Pawn => [0, 0, 0, 0, 0, 0, 0b11111111, 0],
