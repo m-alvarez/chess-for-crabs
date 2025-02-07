@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
 
 use crate::bitboard::Bitboard;
-use crate::moves::{AlgebraicMove, Move};
+use crate::moves::{AlgebraicMove, Move, SimpleMove, KINGSIDE_CASTLE_MOVE, QUEENSIDE_CASTLE_MOVE};
 use crate::piece::{Color, Piece};
 use crate::utils::*;
 use Color::*;
@@ -56,7 +56,8 @@ impl Board {
             *bb &= !mv.delete
         }
         new[mv.piece] |= mv.add;
-        new[self.player] |= mv.add;
+        new[King] |= mv.king_add;
+        new[self.player] |= mv.add | mv.king_add;
         new.player = self.player.opponent();
         let new_pawn = new[Pawn] & !self[Pawn];
         new.en_passant = match self.player {
@@ -113,11 +114,12 @@ impl Board {
         pattern
     }
 
-    pub fn is_pre_legal(&self, mv: &AlgebraicMove) -> Option<Move> {
+    pub fn is_pre_legal(&self, mv: &SimpleMove) -> Option<Move> {
         // This doesn't have to be fast, since the machine never generates AlgebraicMove
         // objects
         let dst_bb = Bitboard::at(mv.dst_square);
         if (dst_bb & self[self.player]).is_populated() {
+            println!("SOMEONE IS THERE!");
             return None;
         }
         let attackers = if mv.captures {
@@ -130,6 +132,7 @@ impl Board {
             None => attackers,
         };
         if attackers.popcnt() != 1 {
+            println!("CANNOT FIND PATH!");
             return None;
         }
 
@@ -145,6 +148,7 @@ impl Board {
         };
 
         if captures.is_populated() != mv.captures {
+            println!("CAPTURE MISMATCH!");
             return None;
         }
 
@@ -152,16 +156,58 @@ impl Board {
             piece: mv.piece,
             delete: captures | attackers,
             add: dst_bb,
+            king_add: Bitboard::empty(),
         })
     }
 
     pub fn is_legal(&self, mv: &AlgebraicMove) -> Option<Move> {
-        let mv = self.is_pre_legal(mv)?;
+        let mv = match mv {
+            AlgebraicMove::Simple(mv) => self.is_pre_legal(mv),
+            AlgebraicMove::CastleLong => self.castle_long(),
+            AlgebraicMove::CastleShort => self.castle_short(),
+        }?;
         if self.apply(&mv).in_check() {
+            println!("WOULD BE IN CHECK!");
             None
         } else {
             Some(mv)
         }
+    }
+
+    fn check_castle_move(&self, path: Bitboard, mid_square: Bitboard) -> bool {
+        if (path & (self[Black] | self[White])).is_populated() {
+            return false;
+        }
+        self.capture_to(self.player.opponent(), mid_square)
+            .is_empty()
+    }
+
+    fn castle_long(&self) -> Option<Move> {
+        if !self.queenside_castling_allowed(self.player) {
+            return None;
+        }
+
+        if !self.check_castle_move(
+            QUEENSIDE_CASTLE_PATH[self.player as usize],
+            QUEENSIDE_CASTLE_MID_SQUARE[self.player as usize],
+        ) {
+            return None;
+        }
+        Some(QUEENSIDE_CASTLE_MOVE[self.player as usize])
+    }
+
+    fn castle_short(&self) -> Option<Move> {
+        if !self.kingside_castling_allowed(self.player) {
+            return None;
+        }
+
+        if !self.check_castle_move(
+            KINGSIDE_CASTLE_PATH[self.player as usize],
+            KINGSIDE_CASTLE_MID_SQUARE[self.player as usize],
+        ) {
+            return None;
+        }
+        Some(KINGSIDE_CASTLE_MOVE[self.player as usize])
     }
 
     pub fn in_check(&self) -> bool {

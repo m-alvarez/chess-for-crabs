@@ -81,7 +81,7 @@ fn main() {
             } else {
                 return Err("I cannot parse that");
             };
-            let mv = if let Some(mv) = game.board.is_pre_legal(&alg) {
+            let mv = if let Some(mv) = game.board.is_legal(&alg) {
                 mv
             } else {
                 return Err("Illegal move");

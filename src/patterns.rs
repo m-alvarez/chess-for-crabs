@@ -18,14 +18,6 @@ pub const fn ray(square: Square, d: (i32, i32)) -> Bitboard {
     Bitboard(pattern)
 }
 
-pub const fn rays<const N: usize>(square: Square, ds: [(i32, i32); N]) -> Bitboard {
-    let mut pattern = 0;
-    const_for!(i in 0 .. N => {
-        pattern |= ray(square, ds[i]).0
-    });
-    Bitboard(pattern)
-}
-
 #[derive(Copy, Clone)]
 pub struct Ray {
     pub pos: Bitboard,
@@ -176,3 +168,21 @@ const fn precompute_rev_pawn_moves() -> [Attacktable; 2] {
     });
     rev_moves
 }
+
+// Not quite attacktables, but we store the occlusion maps for castling in here
+pub const QUEENSIDE_CASTLE_PATH: [Bitboard; 2] = [
+    Bitboard::from_bytes([0b01110000, 0, 0, 0, 0, 0, 0, 0]),
+    Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00000110]),
+];
+pub const KINGSIDE_CASTLE_PATH: [Bitboard; 2] = [
+    Bitboard::from_bytes([0b00000110, 0, 0, 0, 0, 0, 0, 0]),
+    Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00000110]),
+];
+pub const QUEENSIDE_CASTLE_MID_SQUARE: [Bitboard; 2] = [
+    Bitboard::at(Square::xy(3, 7)),
+    Bitboard::at(Square::xy(3, 0)),
+];
+pub const KINGSIDE_CASTLE_MID_SQUARE: [Bitboard; 2] = [
+    Bitboard::at(Square::xy(5, 7)),
+    Bitboard::at(Square::xy(5, 0)),
+];
