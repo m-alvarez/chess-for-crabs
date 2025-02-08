@@ -9,7 +9,7 @@ use crate::piece::{Color, Piece};
 use Color::*;
 use Piece::*;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Bitboard(pub u64);
 
 impl Debug for Bitboard {

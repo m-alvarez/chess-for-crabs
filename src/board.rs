@@ -10,7 +10,7 @@ use Piece::*;
 
 use crate::patterns::*;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Board {
     // First two entries are color boards, then piece boards
     pub bitboards: [Bitboard; 8],

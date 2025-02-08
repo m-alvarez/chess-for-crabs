@@ -6,7 +6,7 @@ use crate::move_log::MoveLog;
 use crate::piece::Color::*;
 use crate::piece::Piece::*;
 use crate::piece::{Color, Piece};
-use std::io::{Result, Write};
+use std::fmt::{Display, Formatter, Result};
 
 fn char_piece(c: char) -> Option<Piece> {
     Some(match c.to_ascii_lowercase() {
@@ -69,6 +69,7 @@ fn read_castling_rights(s: &str) -> Option<u8> {
             'Q' => 0b0100,
             'k' => 0b0010,
             'q' => 0b0001,
+            '-' => return Some(0),
             _ => return None,
         };
         if mask & castling_rights != 0 {
@@ -110,7 +111,7 @@ pub fn parse(s: &str) -> Option<Game> {
     Some(Game { board, log })
 }
 
-fn write_piece(out: &mut impl Write, color: Color, piece: Piece) -> Result<()> {
+fn write_piece(out: &mut Formatter, color: Color, piece: Piece) -> Result {
     let piece = match piece {
         Pawn => 'P',
         Knight => 'N',
@@ -127,7 +128,7 @@ fn write_piece(out: &mut impl Write, color: Color, piece: Piece) -> Result<()> {
     write!(out, "{}", piece)
 }
 
-fn serialize_board(out: &mut impl Write, b: &Board) -> Result<()> {
+fn serialize_board(out: &mut Formatter, b: &Board) -> Result {
     for y in (0..8).rev() {
         let mut empty_spaces = 0;
         for x in 0..8 {
@@ -160,7 +161,7 @@ fn serialize_board(out: &mut impl Write, b: &Board) -> Result<()> {
     Ok(())
 }
 
-fn serialize_player(out: &mut impl Write, c: Color) -> Result<()> {
+fn serialize_player(out: &mut Formatter, c: Color) -> Result {
     write!(
         out,
         "{}",
@@ -171,7 +172,7 @@ fn serialize_player(out: &mut impl Write, c: Color) -> Result<()> {
     )
 }
 
-fn serialize_castling_rights(out: &mut impl Write, board: &Board) -> Result<()> {
+fn serialize_castling_rights(out: &mut Formatter, board: &Board) -> Result {
     if board.kingside_castling_allowed(White) {
         write_piece(out, White, King)?;
     }
@@ -187,7 +188,7 @@ fn serialize_castling_rights(out: &mut impl Write, board: &Board) -> Result<()> 
     Ok(())
 }
 
-fn serialize_en_passant(out: &mut impl Write, board: &Board) -> Result<()> {
+fn serialize_en_passant(out: &mut Formatter, board: &Board) -> Result {
     if board.en_passant == 0 {
         write!(out, "-")
     } else {
@@ -200,13 +201,24 @@ fn serialize_en_passant(out: &mut impl Write, board: &Board) -> Result<()> {
     }
 }
 
-pub fn serialize(out: &mut impl Write, board: &Board) -> Result<()> {
-    serialize_board(out, &board)?;
-    write!(out, " ")?;
-    serialize_player(out, board.player)?;
-    write!(out, " ")?;
-    serialize_castling_rights(out, board)?;
-    write!(out, " ")?;
-    serialize_en_passant(out, board)?;
-    write!(out, " {} 0", board.half_moves) // TODO: serialize half-moves
+// This is mostly just an adapter to dump the FEN of a board
+pub struct FEN<'a>(&'a Board);
+
+impl<'a> Display for FEN<'a> {
+    fn fmt(&self, out: &mut Formatter) -> Result {
+        serialize_board(out, self.0)?;
+        write!(out, " ")?;
+        serialize_player(out, self.0.player)?;
+        write!(out, " ")?;
+        serialize_castling_rights(out, self.0)?;
+        write!(out, " ")?;
+        serialize_en_passant(out, self.0)?;
+        write!(out, " {} 0", self.0.half_moves) // TODO: serialize half-moves
+    }
+}
+
+impl Board {
+    pub fn fen<'a>(&'a self) -> FEN<'a> {
+        FEN(self)
+    }
 }
