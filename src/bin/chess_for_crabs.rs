@@ -51,10 +51,11 @@ fn play_from(mut game: Game) {
             } else {
                 return Err("I cannot parse that");
             };
-            let mv = if let Some(mv) = game.board.is_legal(&alg) {
-                mv
-            } else {
-                return Err("Illegal move");
+            let mv = match game.board.is_legal(&alg) {
+                Ok(mv) => mv,
+                Err(err) => {
+                    return Err(err.as_str())
+                }
             };
             Ok((alg, mv))
         })

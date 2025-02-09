@@ -85,7 +85,7 @@ impl Token {
         match chr {
             'x' => Some(Token::Captures),
             '+' => Some(Token::Check),
-            '*' => Some(Token::Checkmate),
+            '#' => Some(Token::Checkmate),
             'a'..='h' => Some(Token::File(chr as i32 - 'a' as i32)),
             '1'..='8' => Some(Token::Rank(chr as i32 - '1' as i32)),
             '=' => Some(Token::Equals),

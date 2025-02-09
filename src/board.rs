@@ -20,6 +20,33 @@ pub struct Board {
     pub en_passant: u8,
 }
 
+// Mostly used to debug incorrect "illegal move" messages
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum IllegalMove {
+    OccupiedSquare,
+    Unreachable,
+    CaptureMismatch,
+    InCheck,
+    CastlingThroughPiece,
+    CastlingThroughCheck,
+    NoCastlingPermissions
+}
+
+use IllegalMove::*;
+impl IllegalMove {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            OccupiedSquare => "Destination square is occupied",
+            Unreachable => "Piece cannot reach that square",
+            CaptureMismatch => "Capture mismatch",
+            InCheck => "Move would put you in check",
+            CastlingThroughPiece => "Piece in the way of castling",
+            CastlingThroughCheck => "Castling through a check",
+            NoCastlingPermissions => "Castling without rights",
+        }
+    }
+}
+
 impl Board {
     pub fn initial() -> Board {
         let mut b = Board {
@@ -114,13 +141,12 @@ impl Board {
         pattern
     }
 
-    pub fn is_pre_legal(&self, mv: &SimpleMove) -> Option<Move> {
+    pub fn is_pre_legal(&self, mv: &SimpleMove) -> Result<Move, IllegalMove> {
         // This doesn't have to be fast, since the machine never generates AlgebraicMove
         // objects
         let dst_bb = Bitboard::at(mv.dst_square);
         if (dst_bb & self[self.player]).is_populated() {
-            println!("SOMEONE IS THERE!");
-            return None;
+            return Err(IllegalMove::OccupiedSquare);
         }
         let attackers = if mv.captures {
             self.capture_piece_to(mv.piece, self.player, dst_bb)
@@ -132,8 +158,7 @@ impl Board {
             None => attackers,
         };
         if attackers.popcnt() != 1 {
-            println!("CANNOT FIND PATH!");
-            return None;
+            return Err(IllegalMove::Unreachable);
         }
 
         let captures = dst_bb & self[self.player.opponent()];
@@ -148,11 +173,10 @@ impl Board {
         };
 
         if captures.is_populated() != mv.captures {
-            println!("CAPTURE MISMATCH!");
-            return None;
+            return Err(IllegalMove::CaptureMismatch);
         }
 
-        Some(Move {
+        Ok(Move {
             piece: mv.piece,
             delete: captures | attackers,
             add: dst_bb,
@@ -160,62 +184,65 @@ impl Board {
         })
     }
 
-    pub fn is_legal(&self, mv: &AlgebraicMove) -> Option<Move> {
+    pub fn is_legal(&self, mv: &AlgebraicMove) -> Result<Move, IllegalMove> {
         let mv = match mv {
             AlgebraicMove::Simple(mv) => self.is_pre_legal(mv),
             AlgebraicMove::CastleLong => self.castle_long(),
             AlgebraicMove::CastleShort => self.castle_short(),
         }?;
-        if self.apply(&mv).in_check() {
+        if self.apply(&mv).in_check(self.player) {
             println!("WOULD BE IN CHECK!");
-            None
+            Err(IllegalMove::InCheck)
         } else {
-            Some(mv)
+            Ok(mv)
         }
     }
 
-    fn check_castle_move(&self, path: Bitboard, mid_square: Bitboard) -> bool {
+    fn check_castle_move(&self, path: Bitboard, mid_square: Bitboard) -> Result<(), IllegalMove> {
         if (path & (self[Black] | self[White])).is_populated() {
-            return false;
+            println!("{path:?}");
+            return Err(IllegalMove::CastlingThroughPiece);
         }
-        self.capture_to(self.player.opponent(), mid_square)
+        if self
+            .capture_to(self.player.opponent(), mid_square)
             .is_empty()
+        {
+            Ok(())
+        } else {
+            Err(IllegalMove::CastlingThroughCheck)
+        }
     }
 
-    fn castle_long(&self) -> Option<Move> {
+    fn castle_long(&self) -> Result<Move, IllegalMove> {
         if !self.queenside_castling_allowed(self.player) {
-            return None;
+            return Err(IllegalMove::NoCastlingPermissions);
         }
 
-        if !self.check_castle_move(
+        let () = self.check_castle_move(
             QUEENSIDE_CASTLE_PATH[self.player as usize],
             QUEENSIDE_CASTLE_MID_SQUARE[self.player as usize],
-        ) {
-            return None;
-        }
-        Some(QUEENSIDE_CASTLE_MOVE[self.player as usize])
+        )?;
+        Ok(QUEENSIDE_CASTLE_MOVE[self.player as usize])
     }
 
-    fn castle_short(&self) -> Option<Move> {
+    fn castle_short(&self) -> Result<Move, IllegalMove> {
         if !self.kingside_castling_allowed(self.player) {
-            return None;
+            return Err(IllegalMove::NoCastlingPermissions);
         }
 
-        if !self.check_castle_move(
+        let () = self.check_castle_move(
             KINGSIDE_CASTLE_PATH[self.player as usize],
             KINGSIDE_CASTLE_MID_SQUARE[self.player as usize],
-        ) {
-            return None;
-        }
-        Some(KINGSIDE_CASTLE_MOVE[self.player as usize])
+        )?;
+        Ok(KINGSIDE_CASTLE_MOVE[self.player as usize])
     }
 
-    pub fn in_check(&self) -> bool {
-        let king_bb = self[self.player] & self[King];
+    pub fn in_check(&self, color: Color) -> bool {
+        let king_bb = self[color] & self[King];
         if king_bb.is_empty() {
             return false;
         }
-        let attackers = self.capture_to(self.player.opponent(), king_bb);
+        let attackers = self.capture_to(color.opponent(), king_bb);
         attackers.is_populated()
     }
 
@@ -237,7 +264,7 @@ impl Board {
     }
 
     pub fn display(&self, w: &mut impl std::io::Write) -> std::io::Result<()> {
-        if self.in_check() {
+        if self.in_check(self.player) {
             writeln!(w, "Player {} is in check!", self.player)?;
         }
         writeln!(w, "{}", self)

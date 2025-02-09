@@ -172,7 +172,7 @@ const fn precompute_rev_pawn_moves() -> [Attacktable; 2] {
 // Not quite attacktables, but we store the occlusion maps for castling in here
 pub const QUEENSIDE_CASTLE_PATH: [Bitboard; 2] = [
     Bitboard::from_bytes([0b01110000, 0, 0, 0, 0, 0, 0, 0]),
-    Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00000110]),
+    Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b01110000]),
 ];
 pub const KINGSIDE_CASTLE_PATH: [Bitboard; 2] = [
     Bitboard::from_bytes([0b00000110, 0, 0, 0, 0, 0, 0, 0]),

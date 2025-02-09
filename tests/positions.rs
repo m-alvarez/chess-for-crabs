@@ -4,20 +4,22 @@ use std::fs::read_to_string;
 use chess_for_crabs::*;
 use game::Game;
 use moves::AlgebraicMove;
+use board::IllegalMove;
 
 enum Error {
     IOError(std::io::Error),
     ParseError(String),
-    IllegalMove(Game, AlgebraicMove),
+    IllegalMove(Game, AlgebraicMove, IllegalMove),
 }
 
 impl Debug for Error {
     fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {
         match self {
-            Error::IllegalMove(game, mv) => {
+            Error::IllegalMove(game, mv, illegal) => {
                 writeln!(fmt, "Move {mv} is illegal in the position below:")?;
                 writeln!(fmt, "{}", game.board.fen())?;
-                writeln!(fmt, "{}", game.board)
+                writeln!(fmt, "{}", game.board)?;
+                writeln!(fmt, "Reason: {}", illegal.as_str())
             }
             Error::ParseError(s) => {
                 writeln!(fmt, "Error::ParseError({s:?})")
@@ -40,8 +42,8 @@ fn test_position(game_no: usize) -> Result<(), Error> {
     for move_str in moves.split(' ') {
         let alg = AlgebraicMove::parse(&move_str).ok_or(Error::ParseError(move_str.to_string()))?;
         let mv = match game.board.is_legal(&alg) {
-            Some(mv) => mv,
-            None => return Err(Error::IllegalMove(game, alg)),
+            Ok(mv) => mv,
+            Err(illegal) => return Err(Error::IllegalMove(game, alg, illegal)),
         };
         game.make_move(&alg, &mv)
     }
