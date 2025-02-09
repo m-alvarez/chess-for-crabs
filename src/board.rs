@@ -29,7 +29,7 @@ pub enum IllegalMove {
     InCheck,
     CastlingThroughPiece,
     CastlingThroughCheck,
-    NoCastlingPermissions
+    NoCastlingPermissions,
 }
 
 use IllegalMove::*;
@@ -191,7 +191,6 @@ impl Board {
             AlgebraicMove::CastleShort => self.castle_short(),
         }?;
         if self.apply(&mv).in_check(self.player) {
-            println!("WOULD BE IN CHECK!");
             Err(IllegalMove::InCheck)
         } else {
             Ok(mv)
@@ -200,7 +199,6 @@ impl Board {
 
     fn check_castle_move(&self, path: Bitboard, mid_square: Bitboard) -> Result<(), IllegalMove> {
         if (path & (self[Black] | self[White])).is_populated() {
-            println!("{path:?}");
             return Err(IllegalMove::CastlingThroughPiece);
         }
         if self
