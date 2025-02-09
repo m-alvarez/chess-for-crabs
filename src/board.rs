@@ -5,6 +5,7 @@ use crate::bitboard::Bitboard;
 use crate::moves::{AlgebraicMove, Move, SimpleMove, KINGSIDE_CASTLE_MOVE, QUEENSIDE_CASTLE_MOVE};
 use crate::piece::{Color, Piece};
 use crate::utils::*;
+use crate::coords::Line;
 use Color::*;
 use Piece::*;
 
@@ -113,6 +114,8 @@ impl Board {
             Rook => self.linear_attackers(player, &ROOK_RAYS[target]),
             Queen => self.linear_attackers(player, &QUEEN_RAYS[target]),
         };
+        println!("potential_attackers:\n{potential_attackers:?}");
+        println!("attackers:\n{:?}", potential_attackers & self[player] & self[piece]);
         potential_attackers & self[player] & self[piece]
     }
 
@@ -148,15 +151,17 @@ impl Board {
         if (dst_bb & self[self.player]).is_populated() {
             return Err(IllegalMove::OccupiedSquare);
         }
-        let attackers = if mv.captures {
+        let mut attackers = if mv.captures {
             self.capture_piece_to(mv.piece, self.player, dst_bb)
         } else {
             self.move_piece_to(mv.piece, self.player, dst_bb)
         };
-        let attackers = match mv.src_square {
-            Some(l) => attackers & Bitboard::line(l),
-            None => attackers,
-        };
+        if let Some(file) = mv.disambiguate.0 {
+            attackers &= Bitboard::line(Line::AtX(file))
+        }
+        if let Some(rank) = mv.disambiguate.1 {
+            attackers &= Bitboard::line(Line::AtY(rank))
+        }
         if attackers.popcnt() != 1 {
             return Err(IllegalMove::Unreachable);
         }

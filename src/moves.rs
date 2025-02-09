@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::iter::Peekable;
 
 use crate::bitboard::Bitboard;
 use crate::coords::{Line, Square};
@@ -49,7 +50,7 @@ pub const KINGSIDE_CASTLE_MOVE: [Move; 2] = [
 #[derive(Copy, Clone)]
 pub struct SimpleMove {
     pub piece: Piece,
-    pub src_square: Option<Line>,
+    pub disambiguate: (Option<u8>, Option<u8>),
     pub dst_square: Square,
     pub captures: bool,
     pub check: bool,
@@ -96,6 +97,47 @@ impl Token {
     }
 }
 
+fn try_token<It: Iterator<Item=Option<Token>>>(tokens: &mut Peekable<It>, tok: Token) -> Option<Token> {
+    let next = (*tokens.peek()?)?;
+    if next == tok {
+        tokens.next();
+        Some(tok)
+    } else {
+        None
+    }
+}
+
+fn try_piece<It: Iterator<Item=Option<Token>>>(tokens: &mut Peekable<It>) -> Option<Piece> {
+    match (*tokens.peek()?)? {
+        Token::Piece(p) => {
+            tokens.next();
+            Some(p)
+        },
+        _ => None
+    }
+}
+
+fn try_rank<It: Iterator<Item=Option<Token>>>(tokens: &mut Peekable<It>) -> Option<i32> {
+    match (*tokens.peek()?)? {
+        Token::Rank(r) => {
+            tokens.next();
+            Some(r)
+        },
+        _ => None
+    }
+}
+
+fn try_file<It: Iterator<Item=Option<Token>>>(tokens: &mut Peekable<It>) -> Option<i32> {
+    match (*tokens.peek()?)? {
+        Token::File(r) => {
+            tokens.next();
+            Some(r)
+        },
+        _ => None
+    }
+}
+
+
 impl AlgebraicMove {
     pub fn parse(s: &str) -> Option<AlgebraicMove> {
         use Token::*;
@@ -125,7 +167,7 @@ impl AlgebraicMove {
         // Fun fact: algebraic notation is easier to parse back-to-front
         let mut mv = SimpleMove {
             piece: Pawn,
-            src_square: None,
+            disambiguate: (None, None),
             dst_square: Square { x: 0, y: 0 },
             captures: false,
             check: false,
@@ -134,58 +176,38 @@ impl AlgebraicMove {
         };
 
         // Consume check or checkmate mark
-        match (*chrs.peek()?)? {
-            Check => {
-                chrs.next();
-                mv.check = true
-            }
-            Checkmate => {
-                chrs.next();
-                mv.checkmate = true
-            }
-            _ => (),
+        if let Some(_) = try_token(&mut chrs, Check) {
+            mv.check = true
+        } else if let Some(_) = try_token(&mut chrs, Checkmate) {
+            mv.checkmate = true
         }
         // Consume dst
-        match (chrs.next()??, chrs.next()??) {
+        match (try_rank(&mut chrs), try_file(&mut chrs)) {
             // remember it's backwards
-            (Rank(y), File(x)) => mv.dst_square = Square::xy(x, y),
-            _ => return None,
+            (Some(y), Some(x)) => mv.dst_square = Square::xy(x, y),
+            _ => return None
         }
         // Consume capture mark
-        match chrs.peek() {
-            Some(Some(Captures)) => {
-                chrs.next();
-                mv.captures = true
-            }
-            Some(None) => return None,
-            _ => (),
+        if let Some(_) = try_token(&mut chrs, Captures) {
+            mv.captures = true
         }
         // Consume disambiguate
-        match chrs.peek() {
-            None => (),
-            Some(tok) => match (*tok)? {
-                Rank(r) => {
-                    chrs.next();
-                    mv.src_square = Some(Line::AtY(r as u8))
-                }
-                File(f) => {
-                    chrs.next();
-                    mv.src_square = Some(Line::AtX(f as u8))
-                }
-                _ => (),
-            },
+        if let Some(r) = try_rank(&mut chrs) {
+            if let Some(f) = try_file(&mut chrs) {
+                mv.disambiguate = (Some(f as u8), Some(r as u8))
+            } else {
+                mv.disambiguate = (None, Some(r as u8))
+            }
+        } else if let Some(f) = try_file(&mut chrs) {
+            mv.disambiguate = (Some(f as u8), None)
         }
         // Consume piece, if any
-        match chrs.peek() {
-            None => mv.piece = Pawn,
-            Some(tok) => match (*tok)? {
-                Piece(piece) => {
-                    chrs.next();
-                    mv.piece = piece
-                }
-                _ => return None,
-            },
-        }
+        mv.piece = if let Some(piece) = try_piece(&mut chrs) {
+            piece
+        } else {
+            Pawn
+        };
+        // No tokens should remain
         match chrs.peek() {
             None => Some(Self::Simple(mv)),
             Some(_) => None,
@@ -205,9 +227,11 @@ impl Display for AlgebraicMove {
             Pawn => (),
             piece => write!(fmt, "{}", piece.algebraic())?,
         };
-        match mv.src_square {
-            None => (),
-            Some(l) => write!(fmt, "{}", l)?,
+        match mv.disambiguate {
+            (None, None) => (),
+            (Some(f), Some(r)) => write!(fmt, "{}{}", f, r)?,
+            (Some(f), None) => write!(fmt, "{}", f)?,
+            (None, Some(r)) => write!(fmt, "{}", r)?,
         };
         if mv.captures {
             write!(fmt, "x")?
