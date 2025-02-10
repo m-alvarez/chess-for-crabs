@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 use std::iter::Peekable;
 
 use crate::bitboard::Bitboard;
-use crate::coords::{Line, Square};
+use crate::coords::Square;
 use crate::piece::Piece;
 use crate::piece::Piece::*;
 
@@ -30,8 +30,8 @@ pub struct SimpleMove {
 #[derive(Copy, Clone)]
 pub enum AlgebraicMove {
     Simple(SimpleMove),
-    CastleLong,
-    CastleShort,
+    CastleLong { check: bool, checkmate: bool },
+    CastleShort { check: bool, checkmate: bool },
 }
 
 // Everything always comes down to parsing
@@ -47,6 +47,7 @@ enum Token {
     Oh,
     Equals,
 }
+use Token::*;
 
 impl Token {
     fn parse(chr: char) -> Option<Token> {
@@ -67,7 +68,10 @@ impl Token {
     }
 }
 
-fn try_token<It: Iterator<Item=Option<Token>>>(tokens: &mut Peekable<It>, tok: Token) -> Option<Token> {
+fn try_token<It: Iterator<Item = Option<Token>>>(
+    tokens: &mut Peekable<It>,
+    tok: Token,
+) -> Option<Token> {
     let next = (*tokens.peek()?)?;
     if next == tok {
         tokens.next();
@@ -77,61 +81,76 @@ fn try_token<It: Iterator<Item=Option<Token>>>(tokens: &mut Peekable<It>, tok: T
     }
 }
 
-fn try_piece<It: Iterator<Item=Option<Token>>>(tokens: &mut Peekable<It>) -> Option<Piece> {
+fn try_piece<It: Iterator<Item = Option<Token>>>(tokens: &mut Peekable<It>) -> Option<Piece> {
     match (*tokens.peek()?)? {
         Token::Piece(p) => {
             tokens.next();
             Some(p)
-        },
-        _ => None
+        }
+        _ => None,
     }
 }
 
-fn try_rank<It: Iterator<Item=Option<Token>>>(tokens: &mut Peekable<It>) -> Option<i32> {
+fn try_rank<It: Iterator<Item = Option<Token>>>(tokens: &mut Peekable<It>) -> Option<i32> {
     match (*tokens.peek()?)? {
         Token::Rank(r) => {
             tokens.next();
             Some(r)
-        },
-        _ => None
+        }
+        _ => None,
     }
 }
 
-fn try_file<It: Iterator<Item=Option<Token>>>(tokens: &mut Peekable<It>) -> Option<i32> {
+fn try_file<It: Iterator<Item = Option<Token>>>(tokens: &mut Peekable<It>) -> Option<i32> {
     match (*tokens.peek()?)? {
         Token::File(r) => {
             tokens.next();
             Some(r)
-        },
-        _ => None
+        }
+        _ => None,
     }
 }
 
+fn try_castling<It: Iterator<Item = Option<Token>>>(
+    tokens: &mut Peekable<It>,
+) -> Option<AlgebraicMove> {
+    let mut check = false;
+    let mut checkmate = false;
+    if let Some(_) = try_token(tokens, Check) {
+        check = true
+    } else if let Some(_) = try_token(tokens, Checkmate) {
+        checkmate = true
+    }
+    match (*tokens.peek()?)? {
+        Oh => {
+            // Must be castling - is it short or long?
+            tokens.next();
+            if tokens.next()?? != Token::Dash || tokens.next()?? != Token::Oh {
+                return None;
+            }
+            match tokens.next() {
+                None => Some(AlgebraicMove::CastleShort { check, checkmate }),
+                Some(Some(Token::Dash)) => {
+                    if tokens.next()?? == Token::Oh {
+                        Some(AlgebraicMove::CastleLong { check, checkmate })
+                    } else {
+                        None
+                    }
+                }
+                Some(_) => None,
+            }
+        }
+        _ => None,
+    }
+}
 
 impl AlgebraicMove {
     pub fn parse(s: &str) -> Option<AlgebraicMove> {
         use Token::*;
-        let mut chrs = s.chars().rev().map(Token::parse).peekable();
-        match (*chrs.peek()?)? {
-            Oh => {
-                // Must be castling - is it short or long?
-                chrs.next();
-                if chrs.next()?? != Token::Dash || chrs.next()?? != Token::Oh {
-                    return None;
-                }
-                match chrs.next() {
-                    None => return Some(AlgebraicMove::CastleShort),
-                    Some(Some(Token::Dash)) => {
-                        return if chrs.next()?? == Token::Oh {
-                            Some(AlgebraicMove::CastleLong)
-                        } else {
-                            None
-                        }
-                    }
-                    Some(_) => return None,
-                }
-            }
-            _ => (),
+        let mut tokens = s.chars().rev().map(Token::parse).peekable();
+
+        if let Some(castle) = try_castling(&mut tokens) {
+            return Some(castle);
         }
 
         // Fun fact: algebraic notation is easier to parse back-to-front
@@ -146,39 +165,50 @@ impl AlgebraicMove {
         };
 
         // Consume check or checkmate mark
-        if let Some(_) = try_token(&mut chrs, Check) {
+        if let Some(_) = try_token(&mut tokens, Check) {
             mv.check = true
-        } else if let Some(_) = try_token(&mut chrs, Checkmate) {
+        } else if let Some(_) = try_token(&mut tokens, Checkmate) {
             mv.checkmate = true
         }
+
+        if let Some(promote_to) = try_piece(&mut tokens) {
+            // Promotion
+            mv.promotion = Some(promote_to);
+            let _equals = try_token(&mut tokens, Equals)?;
+        }
+
         // Consume dst
-        match (try_rank(&mut chrs), try_file(&mut chrs)) {
+        match (try_rank(&mut tokens), try_file(&mut tokens)) {
             // remember it's backwards
             (Some(y), Some(x)) => mv.dst_square = Square::xy(x, y),
-            _ => return None
+            _ => return None,
         }
         // Consume capture mark
-        if let Some(_) = try_token(&mut chrs, Captures) {
+        if let Some(_) = try_token(&mut tokens, Captures) {
             mv.captures = true
         }
         // Consume disambiguate
-        if let Some(r) = try_rank(&mut chrs) {
-            if let Some(f) = try_file(&mut chrs) {
+        if let Some(r) = try_rank(&mut tokens) {
+            if let Some(f) = try_file(&mut tokens) {
                 mv.disambiguate = (Some(f as u8), Some(r as u8))
             } else {
                 mv.disambiguate = (None, Some(r as u8))
             }
-        } else if let Some(f) = try_file(&mut chrs) {
+        } else if let Some(f) = try_file(&mut tokens) {
             mv.disambiguate = (Some(f as u8), None)
         }
         // Consume piece, if any
-        mv.piece = if let Some(piece) = try_piece(&mut chrs) {
+        mv.piece = if let Some(piece) = try_piece(&mut tokens) {
+            if mv.promotion.is_some() {
+                // Only pawns can promote!
+                return None
+            }
             piece
         } else {
             Pawn
         };
         // No tokens should remain
-        match chrs.peek() {
+        match tokens.peek() {
             None => Some(Self::Simple(mv)),
             Some(_) => None,
         }
@@ -188,11 +218,25 @@ impl Display for AlgebraicMove {
     fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {
         let mv: &SimpleMove;
         match self {
-            AlgebraicMove::CastleLong => return write!(fmt, "O-O-O"),
-            AlgebraicMove::CastleShort => return write!(fmt, "O-O"),
-            AlgebraicMove::Simple(m) => mv = m
+            AlgebraicMove::CastleLong { check, checkmate } => {
+                return write!(
+                    fmt,
+                    "O-O-O{}{}",
+                    if *check { "+" } else { "" },
+                    if *checkmate { "#" } else { "" }
+                )
+            }
+            AlgebraicMove::CastleShort { check, checkmate } => {
+                return write!(
+                    fmt,
+                    "O-O{}{}",
+                    if *check { "+" } else { "" },
+                    if *checkmate { "#" } else { "" }
+                )
+            }
+            AlgebraicMove::Simple(m) => mv = m,
         };
-        
+
         match mv.piece {
             Pawn => (),
             piece => write!(fmt, "{}", piece.algebraic())?,

@@ -2,10 +2,10 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
 
 use crate::bitboard::Bitboard;
+use crate::coords::Line;
 use crate::moves::{AlgebraicMove, Move, SimpleMove};
 use crate::piece::{Color, Piece};
 use crate::utils::*;
-use crate::coords::Line;
 use Color::*;
 use Piece::*;
 
@@ -32,6 +32,7 @@ pub enum IllegalMove {
     CastlingThroughCheck,
     NoCastlingPermissions,
     Ambiguous,
+    IllegalPromotion,
 }
 
 use IllegalMove::*;
@@ -46,6 +47,7 @@ impl IllegalMove {
             CastlingThroughCheck => "Castling through a check",
             NoCastlingPermissions => "Castling without rights",
             Ambiguous => "Ambiguous",
+            IllegalPromotion => "Illegal promotion (incorrect piece or rank)",
         }
     }
 }
@@ -78,8 +80,6 @@ const KINGSIDE_CASTLE_MOVE: [Move; 2] = [
         king_add: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00000010]),
     },
 ];
-
-
 
 impl Board {
     pub fn initial() -> Board {
@@ -142,11 +142,12 @@ impl Board {
     pub fn pawn_move(&self, player: Color, target: Bitboard) -> Bitboard {
         let potential_attackers = REV_PAWN_MOVES[player as usize][target];
         let occupied = (self[Black] | self[White]).0;
-        let potential_attackers = potential_attackers | (if player == Black {
-            Bitboard(!(occupied >> 8))
-        } else {
-            Bitboard(!(occupied << 8))
-        } & REV_PAWN_DBL_MOVES[player as usize][target]);
+        let potential_attackers = potential_attackers
+            | (if player == Black {
+                Bitboard(!(occupied >> 8))
+            } else {
+                Bitboard(!(occupied << 8))
+            } & REV_PAWN_DBL_MOVES[player as usize][target]);
         potential_attackers & self[player] & self[Pawn]
     }
 
@@ -176,6 +177,21 @@ impl Board {
     }
 
     pub fn is_pre_legal(&self, mv: &SimpleMove) -> Result<Move, IllegalMove> {
+        let piece;
+        if let Some(promote_to) = mv.promotion {
+            if mv.piece != Pawn {
+                return Err(IllegalMove::IllegalPromotion);
+            }
+            if match self.player {
+                White => mv.dst_square.y != 7,
+                Black => mv.dst_square.y != 0,
+            } {
+                return Err(IllegalMove::IllegalPromotion);
+            }
+            piece = promote_to
+        } else {
+            piece = mv.piece
+        }
         // This doesn't have to be fast, since the machine never generates AlgebraicMove
         // objects
         let dst_bb = Bitboard::at(mv.dst_square);
@@ -210,12 +226,12 @@ impl Board {
 
         if attackers.popcnt() == 0 {
             return Err(IllegalMove::Unreachable);
-        } 
+        }
         if attackers.popcnt() == 1 {
             // Happy case, no need to iterate over every bit. The performance difference
             // is meaningless, though
             let tentative_move = Move {
-                piece: mv.piece,
+                piece,
                 delete: captures | attackers,
                 add: dst_bb,
                 king_add: Bitboard::empty(),
@@ -229,11 +245,11 @@ impl Board {
             // I don't like that this is necessary, but the game dumps I get from
             // lichess don't disambiguate pieces when one of them is pinned. Again,
             // this is not performance-critical, so this doesn't matter
-            for i in 0 .. 63 {
+            for i in 0..63 {
                 let pat = Bitboard(1 << i) & attackers;
                 if pat.is_populated() {
                     let tentative_move = Move {
-                        piece: mv.piece,
+                        piece,
                         delete: captures | pat,
                         add: dst_bb,
                         king_add: Bitboard::empty(),
@@ -249,20 +265,20 @@ impl Board {
                 Err(IllegalMove::Ambiguous)
             } else {
                 Ok(Move {
-                    piece: mv.piece,
+                    piece,
                     delete: captures | attackers,
                     add: dst_bb,
                     king_add: Bitboard::empty(),
                 })
             }
-        } 
+        }
     }
 
     pub fn is_legal(&self, mv: &AlgebraicMove) -> Result<Move, IllegalMove> {
         let mv = match mv {
             AlgebraicMove::Simple(mv) => self.is_pre_legal(mv),
-            AlgebraicMove::CastleLong => self.castle_long(),
-            AlgebraicMove::CastleShort => self.castle_short(),
+            AlgebraicMove::CastleLong { .. } => self.castle_long(),
+            AlgebraicMove::CastleShort { .. } => self.castle_short(),
         }?;
         if self.apply(&mv).in_check(self.player) {
             Err(IllegalMove::InCheck)
