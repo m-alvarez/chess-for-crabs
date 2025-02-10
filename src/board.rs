@@ -31,6 +31,7 @@ pub enum IllegalMove {
     CastlingThroughPiece,
     CastlingThroughCheck,
     NoCastlingPermissions,
+    Ambiguous,
 }
 
 use IllegalMove::*;
@@ -44,6 +45,7 @@ impl IllegalMove {
             CastlingThroughPiece => "Piece in the way of castling",
             CastlingThroughCheck => "Castling through a check",
             NoCastlingPermissions => "Castling without rights",
+            Ambiguous => "Ambiguous",
         }
     }
 }
@@ -191,9 +193,6 @@ impl Board {
         if let Some(rank) = mv.disambiguate.1 {
             attackers &= Bitboard::line(Line::AtY(rank))
         }
-        if attackers.popcnt() != 1 {
-            return Err(IllegalMove::Unreachable);
-        }
 
         let captures = dst_bb & self[self.player.opponent()];
         let captures = if mv.piece == Pawn && captures.is_empty() {
@@ -205,17 +204,58 @@ impl Board {
         } else {
             captures
         };
-
         if captures.is_populated() != mv.captures {
             return Err(IllegalMove::CaptureMismatch);
         }
 
-        Ok(Move {
-            piece: mv.piece,
-            delete: captures | attackers,
-            add: dst_bb,
-            king_add: Bitboard::empty(),
-        })
+        if attackers.popcnt() == 0 {
+            return Err(IllegalMove::Unreachable);
+        } 
+        if attackers.popcnt() == 1 {
+            // Happy case, no need to iterate over every bit. The performance difference
+            // is meaningless, though
+            let tentative_move = Move {
+                piece: mv.piece,
+                delete: captures | attackers,
+                add: dst_bb,
+                king_add: Bitboard::empty(),
+            };
+            if self.apply(&tentative_move).in_check(self.player) {
+                Err(IllegalMove::InCheck)
+            } else {
+                Ok(tentative_move)
+            }
+        } else {
+            // I don't like that this is necessary, but the game dumps I get from
+            // lichess don't disambiguate pieces when one of them is pinned. Again,
+            // this is not performance-critical, so this doesn't matter
+            for i in 0 .. 63 {
+                let pat = Bitboard(1 << i) & attackers;
+                if pat.is_populated() {
+                    let tentative_move = Move {
+                        piece: mv.piece,
+                        delete: captures | pat,
+                        add: dst_bb,
+                        king_add: Bitboard::empty(),
+                    };
+                    if self.apply(&tentative_move).in_check(self.player) {
+                        attackers &= !pat
+                    }
+                }
+            }
+            if attackers.popcnt() == 0 {
+                Err(IllegalMove::InCheck)
+            } else if attackers.popcnt() > 1 {
+                Err(IllegalMove::Ambiguous)
+            } else {
+                Ok(Move {
+                    piece: mv.piece,
+                    delete: captures | attackers,
+                    add: dst_bb,
+                    king_add: Bitboard::empty(),
+                })
+            }
+        } 
     }
 
     pub fn is_legal(&self, mv: &AlgebraicMove) -> Result<Move, IllegalMove> {
