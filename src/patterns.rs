@@ -107,6 +107,7 @@ const fn precompute_jump_attacks<const N: usize>(d: &[(i32, i32); N]) -> Attackt
 }
 
 pub const REV_PAWN_MOVES: [Attacktable; 2] = precompute_rev_pawn_moves();
+pub const REV_PAWN_DBL_MOVES: [Attacktable; 2] = precompute_rev_pawn_dbl_moves();
 pub const REV_PAWN_ATTACKS: [Attacktable; 2] = precompute_rev_pawn_attacks();
 pub const REV_PAWN_EP_ATTACKS: [[Attacktable; 9]; 2] = precompute_rev_pawn_ep_attacks();
 
@@ -160,9 +161,23 @@ const fn precompute_rev_pawn_moves() -> [Attacktable; 2] {
         const_for!(y in 0 .. 8 => {
             let idx = (63 - x - y * 8) as u64;
             let bb = 1 << idx;
-            let white_pat = bb << 8 | (bb << 16 & Bitboard::line(AtY(1)).0);
+            rev_moves[White as usize].0[idx as usize] = Bitboard(bb << 8);
+            rev_moves[Black as usize].0[idx as usize] = Bitboard(bb >> 8);
+        });
+    });
+    rev_moves
+}
+
+const fn precompute_rev_pawn_dbl_moves() -> [Attacktable; 2] {
+    let mut rev_moves = [Attacktable([Bitboard::empty(); 64]); 2];
+    // Redundant computation, but it's all done in compile time
+    const_for!(x in 0 .. 8 => {
+        const_for!(y in 0 .. 8 => {
+            let idx = (63 - x - y * 8) as u64;
+            let bb = 1 << idx;
+            let white_pat = bb << 16 & Bitboard::line(AtY(1)).0;
             rev_moves[White as usize].0[idx as usize] = Bitboard(white_pat);
-            let black_pat = bb >> 8 | (bb >> 16 & Bitboard::line(AtY(6)).0);
+            let black_pat = bb >> 16 & Bitboard::line(AtY(6)).0;
             rev_moves[Black as usize].0[idx as usize] = Bitboard(black_pat);
         });
     });

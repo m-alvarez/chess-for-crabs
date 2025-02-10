@@ -17,36 +17,6 @@ pub struct Move {
     pub king_add: Bitboard,
 }
 
-pub const QUEENSIDE_CASTLE_MOVE: [Move; 2] = [
-    Move {
-        delete: Bitboard::from_bytes([0b10001000, 0, 0, 0, 0, 0, 0, 0]),
-        piece: Rook,
-        add: Bitboard::from_bytes([0b00010000, 0, 0, 0, 0, 0, 0, 0]),
-        king_add: Bitboard::from_bytes([0b00100000, 0, 0, 0, 0, 0, 0, 0]),
-    },
-    Move {
-        delete: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b10001000]),
-        piece: Rook,
-        add: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00010000]),
-        king_add: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00100000]),
-    },
-];
-pub const KINGSIDE_CASTLE_MOVE: [Move; 2] = [
-    Move {
-        delete: Bitboard::from_bytes([0b00001001, 0, 0, 0, 0, 0, 0, 0]),
-        piece: Rook,
-        add: Bitboard::from_bytes([0b00000100, 0, 0, 0, 0, 0, 0, 0]),
-        king_add: Bitboard::from_bytes([0b00000010, 0, 0, 0, 0, 0, 0, 0]),
-    },
-    Move {
-        delete: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00001001]),
-        piece: Rook,
-        add: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00000100]),
-        king_add: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00000010]),
-    },
-];
-
-
 #[derive(Copy, Clone)]
 pub struct SimpleMove {
     pub piece: Piece,

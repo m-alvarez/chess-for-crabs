@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
 
 use crate::bitboard::Bitboard;
-use crate::moves::{AlgebraicMove, Move, SimpleMove, KINGSIDE_CASTLE_MOVE, QUEENSIDE_CASTLE_MOVE};
+use crate::moves::{AlgebraicMove, Move, SimpleMove};
 use crate::piece::{Color, Piece};
 use crate::utils::*;
 use crate::coords::Line;
@@ -47,6 +47,37 @@ impl IllegalMove {
         }
     }
 }
+
+const QUEENSIDE_CASTLE_MOVE: [Move; 2] = [
+    Move {
+        delete: Bitboard::from_bytes([0b10001000, 0, 0, 0, 0, 0, 0, 0]),
+        piece: Rook,
+        add: Bitboard::from_bytes([0b00010000, 0, 0, 0, 0, 0, 0, 0]),
+        king_add: Bitboard::from_bytes([0b00100000, 0, 0, 0, 0, 0, 0, 0]),
+    },
+    Move {
+        delete: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b10001000]),
+        piece: Rook,
+        add: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00010000]),
+        king_add: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00100000]),
+    },
+];
+const KINGSIDE_CASTLE_MOVE: [Move; 2] = [
+    Move {
+        delete: Bitboard::from_bytes([0b00001001, 0, 0, 0, 0, 0, 0, 0]),
+        piece: Rook,
+        add: Bitboard::from_bytes([0b00000100, 0, 0, 0, 0, 0, 0, 0]),
+        king_add: Bitboard::from_bytes([0b00000010, 0, 0, 0, 0, 0, 0, 0]),
+    },
+    Move {
+        delete: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00001001]),
+        piece: Rook,
+        add: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00000100]),
+        king_add: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00000010]),
+    },
+];
+
+
 
 impl Board {
     pub fn initial() -> Board {
@@ -105,21 +136,19 @@ impl Board {
         Bitboard(pattern)
     }
 
-    pub fn move_piece_to(&self, piece: Piece, player: Color, target: Bitboard) -> Bitboard {
-        let potential_attackers = match piece {
-            Pawn => REV_PAWN_MOVES[player as usize][target],
-            King => KING_ATTACKS[target],
-            Knight => KNIGHT_ATTACKS[target],
-            Bishop => self.linear_attackers(player, &BISHOP_RAYS[target]),
-            Rook => self.linear_attackers(player, &ROOK_RAYS[target]),
-            Queen => self.linear_attackers(player, &QUEEN_RAYS[target]),
-        };
-        println!("potential_attackers:\n{potential_attackers:?}");
-        println!("attackers:\n{:?}", potential_attackers & self[player] & self[piece]);
-        potential_attackers & self[player] & self[piece]
+    // TODO: pawn moves with blocking can be done with rays and collision testing
+    pub fn pawn_move(&self, player: Color, target: Bitboard) -> Bitboard {
+        let potential_attackers = REV_PAWN_MOVES[player as usize][target];
+        let occupied = (self[Black] | self[White]).0;
+        let potential_attackers = potential_attackers | (if player == Black {
+            Bitboard(!(occupied >> 8))
+        } else {
+            Bitboard(!(occupied << 8))
+        } & REV_PAWN_DBL_MOVES[player as usize][target]);
+        potential_attackers & self[player] & self[Pawn]
     }
 
-    pub fn capture_piece_to(&self, piece: Piece, player: Color, target: Bitboard) -> Bitboard {
+    pub fn piece_capture(&self, player: Color, piece: Piece, target: Bitboard) -> Bitboard {
         let potential_attackers = match piece {
             Pawn => {
                 REV_PAWN_ATTACKS[player as usize][target]
@@ -138,7 +167,7 @@ impl Board {
     pub fn capture_to(&self, player: Color, target: Bitboard) -> Bitboard {
         let mut pattern: Bitboard = Bitboard::empty();
         for piece in Piece::list() {
-            let bb = self.capture_piece_to(*piece, player, target);
+            let bb = self.piece_capture(player, *piece, target);
             pattern |= bb;
         }
         pattern
@@ -151,10 +180,10 @@ impl Board {
         if (dst_bb & self[self.player]).is_populated() {
             return Err(IllegalMove::OccupiedSquare);
         }
-        let mut attackers = if mv.captures {
-            self.capture_piece_to(mv.piece, self.player, dst_bb)
+        let mut attackers = if mv.piece != Pawn || mv.captures {
+            self.piece_capture(self.player, mv.piece, dst_bb)
         } else {
-            self.move_piece_to(mv.piece, self.player, dst_bb)
+            self.pawn_move(self.player, dst_bb)
         };
         if let Some(file) = mv.disambiguate.0 {
             attackers &= Bitboard::line(Line::AtX(file))
