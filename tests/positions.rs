@@ -39,7 +39,7 @@ fn test_position(game_no: usize) -> Result<(), Error> {
     };
     let mut game = Game::new();
 
-    for move_str in moves.split(' ') {
+    for move_str in moves.split_whitespace() {
         let alg = AlgebraicMove::parse(&move_str).ok_or(Error::ParseError(move_str.to_string()))?;
         let mv = match game.board.is_legal(&alg) {
             Ok(mv) => mv,
