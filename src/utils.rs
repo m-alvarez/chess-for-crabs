@@ -6,9 +6,16 @@ macro_rules! const_for {
     ($var:ident in $range:expr => $body:stmt) => {
         {
             let mut $var = $range.start;
-            while $var < $range.end {
-                $body
-                $var = $var + 1
+            if ($range.end >= $range.start) {
+                while $var < $range.end {
+                    $body
+                    $var = $var + 1
+                }
+            } else {
+                while $var >= $range.end {
+                    $body
+                    $var = $var - 1
+                }
             }
         }
     }

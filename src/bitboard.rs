@@ -1,10 +1,10 @@
 use std::fmt::{Debug, Formatter};
-use std::ops::{BitAnd, BitOr, BitXor, Not};
+use std::ops::{BitAnd, BitOr, BitXor, Not, Sub};
 use std::ops::{BitAndAssign, BitOrAssign, BitXorAssign};
 
 use std::arch::x86_64::_popcnt64;
 
-use crate::coords::{Square, Line};
+use crate::coords::{Line, Square};
 use crate::piece::{Color, Piece};
 use Color::*;
 use Piece::*;
@@ -25,6 +25,12 @@ impl Debug for Bitboard {
         }
         write!(fmt, "  a b c d e f g h")?;
         Ok(())
+    }
+}
+
+impl Default for Bitboard {
+    fn default() -> Self {
+        Bitboard(0)
     }
 }
 
@@ -71,6 +77,13 @@ impl Not for Bitboard {
     }
 }
 
+impl Sub for Bitboard {
+    type Output = Bitboard;
+    fn sub(self, other: Bitboard) -> Self::Output {
+        Bitboard(self.0.wrapping_sub(other.0))
+    }
+}
+
 static LINE_AT_Y: [Bitboard; 8] = [
     Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b11111111]),
     Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0b11111111, 0]),
@@ -100,6 +113,18 @@ impl Bitboard {
 
     pub const fn to_index(self) -> usize {
         self.0.ilog2() as usize
+    }
+
+    pub const fn rank(self) -> usize {
+        7 - (self.to_index() >> 3)
+    }
+
+    pub const fn file(self) -> usize {
+        7 - (self.to_index() & 7)
+    }
+
+    pub const fn coords(self) -> (usize, usize) {
+        (self.file(), self.rank())
     }
 
     pub const fn initial_white(kind: Piece) -> Bitboard {
@@ -164,5 +189,21 @@ impl Bitboard {
             pattern = pattern & boards[i].0;
         });
         Bitboard(pattern)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bb_rank_file() {
+        for x in 0 .. 8 {
+            for y in 0 .. 8 {
+                let bb = Bitboard::at(Square::xy(x, y));
+                assert!(bb.file() == x as usize);
+                assert!(bb.rank() == y as usize);
+            }
+        }
     }
 }

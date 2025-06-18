@@ -173,16 +173,16 @@ fn serialize_player(out: &mut Formatter, c: Color) -> Result {
 }
 
 fn serialize_castling_rights(out: &mut Formatter, board: &Board) -> Result {
-    if board.kingside_castling_allowed(White) {
+    if board.short_castling_allowed(White) {
         write_piece(out, White, King)?;
     }
-    if board.queenside_castling_allowed(White) {
+    if board.long_castling_allowed(White) {
         write_piece(out, White, Queen)?;
     }
-    if board.kingside_castling_allowed(Black) {
+    if board.short_castling_allowed(Black) {
         write_piece(out, Black, King)?;
     }
-    if board.queenside_castling_allowed(Black) {
+    if board.long_castling_allowed(Black) {
         write_piece(out, Black, Queen)?;
     }
     Ok(())

@@ -8,17 +8,21 @@ use crate::piece::Piece::*;
 
 // Beware: in a promotion, `piece` is the type of the promoted piece
 #[derive(Copy, Clone)]
-pub struct Move {
+pub struct SimpleMove {
     pub delete: Bitboard,
     pub piece: Piece,
     pub add: Bitboard,
-    // I hate castling
-    // In the future, maybe it's worth to just have 6 bitboards and do SIMD
-    pub king_add: Bitboard,
 }
 
 #[derive(Copy, Clone)]
-pub struct SimpleMove {
+pub enum Move {
+    Simple(SimpleMove),
+    CastleLong,
+    CastleShort,
+}
+
+#[derive(Copy, Clone)]
+pub struct SimpleAlgebraicMove {
     pub piece: Piece,
     pub disambiguate: (Option<u8>, Option<u8>),
     pub dst_square: Square,
@@ -29,7 +33,7 @@ pub struct SimpleMove {
 }
 #[derive(Copy, Clone)]
 pub enum AlgebraicMove {
-    Simple(SimpleMove),
+    Simple(SimpleAlgebraicMove),
     CastleLong { check: bool, checkmate: bool },
     CastleShort { check: bool, checkmate: bool },
 }
@@ -154,7 +158,7 @@ impl AlgebraicMove {
         }
 
         // Fun fact: algebraic notation is easier to parse back-to-front
-        let mut mv = SimpleMove {
+        let mut mv = SimpleAlgebraicMove {
             piece: Pawn,
             disambiguate: (None, None),
             dst_square: Square { x: 0, y: 0 },
@@ -201,7 +205,7 @@ impl AlgebraicMove {
         mv.piece = if let Some(piece) = try_piece(&mut tokens) {
             if mv.promotion.is_some() {
                 // Only pawns can promote!
-                return None
+                return None;
             }
             piece
         } else {
@@ -216,7 +220,7 @@ impl AlgebraicMove {
 }
 impl Display for AlgebraicMove {
     fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {
-        let mv: &SimpleMove;
+        let mv: &SimpleAlgebraicMove;
         match self {
             AlgebraicMove::CastleLong { check, checkmate } => {
                 return write!(

@@ -1,9 +1,6 @@
 use crate::board::Board;
 use crate::move_log::MoveLog;
-use crate::piece::Color;
 use crate::moves::{AlgebraicMove, Move};
-
-use Color::*;
 
 pub struct Game {
     pub board: Board,

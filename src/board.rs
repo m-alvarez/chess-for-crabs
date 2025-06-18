@@ -3,7 +3,7 @@ use std::ops::{Index, IndexMut};
 
 use crate::bitboard::Bitboard;
 use crate::coords::Line;
-use crate::moves::{AlgebraicMove, Move, SimpleMove};
+use crate::moves::{AlgebraicMove, Move, SimpleAlgebraicMove, SimpleMove};
 use crate::piece::{Color, Piece};
 use crate::utils::*;
 use Color::*;
@@ -52,32 +52,33 @@ impl IllegalMove {
     }
 }
 
-const QUEENSIDE_CASTLE_MOVE: [Move; 2] = [
-    Move {
+pub struct CastleInfo {
+    delete: Bitboard,
+    add_rook: Bitboard,
+    add_king: Bitboard,
+}
+const LONG_CASTLE_INFO: [CastleInfo; 2] = [
+    CastleInfo {
         delete: Bitboard::from_bytes([0b10001000, 0, 0, 0, 0, 0, 0, 0]),
-        piece: Rook,
-        add: Bitboard::from_bytes([0b00010000, 0, 0, 0, 0, 0, 0, 0]),
-        king_add: Bitboard::from_bytes([0b00100000, 0, 0, 0, 0, 0, 0, 0]),
+        add_rook: Bitboard::from_bytes([0b00010000, 0, 0, 0, 0, 0, 0, 0]),
+        add_king: Bitboard::from_bytes([0b00100000, 0, 0, 0, 0, 0, 0, 0]),
     },
-    Move {
+    CastleInfo {
         delete: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b10001000]),
-        piece: Rook,
-        add: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00010000]),
-        king_add: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00100000]),
+        add_rook: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00010000]),
+        add_king: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00100000]),
     },
 ];
-const KINGSIDE_CASTLE_MOVE: [Move; 2] = [
-    Move {
+const SHORT_CASTLE_INFO: [CastleInfo; 2] = [
+    CastleInfo {
         delete: Bitboard::from_bytes([0b00001001, 0, 0, 0, 0, 0, 0, 0]),
-        piece: Rook,
-        add: Bitboard::from_bytes([0b00000100, 0, 0, 0, 0, 0, 0, 0]),
-        king_add: Bitboard::from_bytes([0b00000010, 0, 0, 0, 0, 0, 0, 0]),
+        add_rook: Bitboard::from_bytes([0b00000100, 0, 0, 0, 0, 0, 0, 0]),
+        add_king: Bitboard::from_bytes([0b00000010, 0, 0, 0, 0, 0, 0, 0]),
     },
-    Move {
+    CastleInfo {
         delete: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00001001]),
-        piece: Rook,
-        add: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00000100]),
-        king_add: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00000010]),
+        add_rook: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00000100]),
+        add_king: Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00000010]),
     },
 ];
 
@@ -110,15 +111,18 @@ impl Board {
         }
     }
 
-    pub fn apply(&self, mv: &Move) -> Board {
+    pub fn occupancy(&self) -> Bitboard {
+        self[Black] | self[White]
+    }
+
+    pub fn apply_simple(&self, mv: &SimpleMove) -> Board {
         // This will be SIMD eventually
         let mut new = *self;
         for bb in new.bitboards.iter_mut() {
             *bb &= !mv.delete
         }
         new[mv.piece] |= mv.add;
-        new[King] |= mv.king_add;
-        new[self.player] |= mv.add | mv.king_add;
+        new[self.player] |= mv.add;
         new.player = self.player.opponent();
         let new_pawn = new[Pawn] & !self[Pawn];
         new.en_passant = match self.player {
@@ -126,6 +130,21 @@ impl Board {
             White => (((new_pawn.0 << 16) & mv.delete.0) >> 48) as u8,
         };
         new
+    }
+
+    pub fn apply_castle(&self, info: &CastleInfo) -> Board {
+        let mut new = *self;
+        new[Rook] = new[Rook] & !info.delete | info.add_rook;
+        new[King] = info.add_king;
+        new
+    }
+
+    pub fn apply(&self, mv: &Move) -> Board {
+        match mv {
+            Move::Simple(s) => self.apply_simple(s),
+            Move::CastleLong => self.apply_castle(&LONG_CASTLE_INFO[self.player as usize]),
+            Move::CastleShort => self.apply_castle(&SHORT_CASTLE_INFO[self.player as usize]),
+        }
     }
 
     pub fn linear_attackers<const N: usize>(&self, player: Color, rays: &[Ray; N]) -> Bitboard {
@@ -176,7 +195,7 @@ impl Board {
         pattern
     }
 
-    pub fn is_pre_legal(&self, mv: &SimpleMove) -> Result<Move, IllegalMove> {
+    pub fn is_pre_legal(&self, mv: &SimpleAlgebraicMove) -> Result<Move, IllegalMove> {
         let piece;
         if let Some(promote_to) = mv.promotion {
             if mv.piece != Pawn {
@@ -230,16 +249,15 @@ impl Board {
         if attackers.popcnt() == 1 {
             // Happy case, no need to iterate over every bit. The performance difference
             // is meaningless, though
-            let tentative_move = Move {
+            let tentative_move = SimpleMove {
                 piece,
                 delete: captures | attackers,
                 add: dst_bb,
-                king_add: Bitboard::empty(),
             };
-            if self.apply(&tentative_move).in_check(self.player) {
+            if self.apply_simple(&tentative_move).in_check(self.player) {
                 Err(IllegalMove::InCheck)
             } else {
-                Ok(tentative_move)
+                Ok(Move::Simple(tentative_move))
             }
         } else {
             // I don't like that this is necessary, but the game dumps I get from
@@ -248,13 +266,12 @@ impl Board {
             for i in 0..63 {
                 let pat = Bitboard(1 << i) & attackers;
                 if pat.is_populated() {
-                    let tentative_move = Move {
+                    let tentative_move = SimpleMove {
                         piece,
                         delete: captures | pat,
                         add: dst_bb,
-                        king_add: Bitboard::empty(),
                     };
-                    if self.apply(&tentative_move).in_check(self.player) {
+                    if self.apply_simple(&tentative_move).in_check(self.player) {
                         attackers &= !pat
                     }
                 }
@@ -264,12 +281,11 @@ impl Board {
             } else if attackers.popcnt() > 1 {
                 Err(IllegalMove::Ambiguous)
             } else {
-                Ok(Move {
+                Ok(Move::Simple(SimpleMove {
                     piece,
                     delete: captures | attackers,
                     add: dst_bb,
-                    king_add: Bitboard::empty(),
-                })
+                }))
             }
         }
     }
@@ -302,27 +318,27 @@ impl Board {
     }
 
     fn castle_long(&self) -> Result<Move, IllegalMove> {
-        if !self.queenside_castling_allowed(self.player) {
+        if !self.long_castling_allowed(self.player) {
             return Err(IllegalMove::NoCastlingPermissions);
         }
 
         let () = self.check_castle_move(
-            QUEENSIDE_CASTLE_PATH[self.player as usize],
-            QUEENSIDE_CASTLE_MID_SQUARE[self.player as usize],
+            LONG_CASTLE_PATH[self.player as usize],
+            LONG_CASTLE_MID_SQUARE[self.player as usize],
         )?;
-        Ok(QUEENSIDE_CASTLE_MOVE[self.player as usize])
+        Ok(Move::CastleLong)
     }
 
     fn castle_short(&self) -> Result<Move, IllegalMove> {
-        if !self.kingside_castling_allowed(self.player) {
+        if !self.short_castling_allowed(self.player) {
             return Err(IllegalMove::NoCastlingPermissions);
         }
 
         let () = self.check_castle_move(
-            KINGSIDE_CASTLE_PATH[self.player as usize],
-            KINGSIDE_CASTLE_MID_SQUARE[self.player as usize],
+            SHORT_CASTLE_PATH[self.player as usize],
+            SHORT_CASTLE_MID_SQUARE[self.player as usize],
         )?;
-        Ok(KINGSIDE_CASTLE_MOVE[self.player as usize])
+        Ok(Move::CastleShort)
     }
 
     pub fn in_check(&self, color: Color) -> bool {
@@ -334,7 +350,7 @@ impl Board {
         attackers.is_populated()
     }
 
-    pub fn kingside_castling_allowed(&self, color: Color) -> bool {
+    pub fn short_castling_allowed(&self, color: Color) -> bool {
         // Can be done jump-free if need be
         0 != self.castling_rights
             & match color {
@@ -343,7 +359,7 @@ impl Board {
             }
     }
 
-    pub fn queenside_castling_allowed(&self, color: Color) -> bool {
+    pub fn long_castling_allowed(&self, color: Color) -> bool {
         0 != self.castling_rights
             & match color {
                 White => 0b0100,

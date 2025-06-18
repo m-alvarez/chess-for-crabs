@@ -10,4 +10,5 @@ pub mod move_log;
 pub mod moves;
 pub mod patterns;
 pub mod piece;
+pub mod gen;
 pub mod eval;
