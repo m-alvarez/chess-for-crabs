@@ -5,60 +5,6 @@ use std::ops::{Index, IndexMut};
 use Color::*;
 use Line::*;
 
-pub const fn ray(square: Square, d: (i32, i32)) -> Bitboard {
-    let (dx, dy) = d;
-    let mut pattern: u64 = 0;
-    let mut x = square.x as i32 + dx;
-    let mut y = square.y as i32 + dy;
-    while let Some(mv) = Square::xy_checked(x, y) {
-        pattern |= Bitboard::at(mv).0;
-        x += dx;
-        y += dy;
-    }
-    Bitboard(pattern)
-}
-
-#[derive(Copy, Clone)]
-pub struct Ray {
-    pub pos: Bitboard,
-    pub neg: Bitboard,
-}
-
-pub struct Raytable<const N: usize>([[Ray; N]; 64]);
-impl<const N: usize> Raytable<N> {
-    pub const fn rays(&self, pt: Bitboard) -> &[Ray; N] {
-        &self.0[pt.to_index()]
-    }
-}
-impl<const N: usize> Index<Bitboard> for Raytable<N> {
-    type Output = [Ray; N];
-    fn index(&self, idx: Bitboard) -> &Self::Output {
-        self.rays(idx)
-    }
-}
-
-const fn precompute_rays<const N: usize>(ds: [(i32, i32); N]) -> Raytable<N> {
-    let empty_ray = Ray {
-        pos: Bitboard::empty(),
-        neg: Bitboard::empty(),
-    };
-    let mut rays = [[empty_ray; N]; 64];
-    const_for!(x in 0 .. 8 => {
-        const_for!(y in 0 .. 8 => {
-            const_for!(i in 0 .. N => {
-                let idx = (63 - x - y * 8) as usize;
-                let sq = Square { x: x as u8, y: y as u8 };
-                rays[idx][i].pos = ray(sq, ds[i]);
-                rays[idx][i].neg = ray(sq, (-ds[i].0, -ds[i].1));
-            });
-        });
-    });
-    Raytable::<N>(rays)
-}
-pub const BISHOP_RAYS: Raytable<2> = precompute_rays([SE, SW]);
-pub const ROOK_RAYS: Raytable<2> = precompute_rays([S, W]);
-pub const QUEEN_RAYS: Raytable<4> = precompute_rays([W, SW, S, SE]);
-
 const fn precompute_ranks() -> SquareIndex<Bitboard> {
     let mut ranks = SquareIndex::new();
     const_for!(y in 0 .. 8 => {

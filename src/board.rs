@@ -5,7 +5,6 @@ use crate::bitboard::Bitboard;
 use crate::coords::Line;
 use crate::moves::{AlgebraicMove, Move, SimpleAlgebraicMove, SimpleMove};
 use crate::piece::{Color, Piece};
-use crate::utils::*;
 use Color::*;
 use Piece::*;
 
@@ -147,16 +146,6 @@ impl Board {
         }
     }
 
-    pub fn linear_attackers<const N: usize>(&self, player: Color, rays: &[Ray; N]) -> Bitboard {
-        let occupancy = (self[player] | self[player.opponent()]).0;
-        let mut pattern = 0;
-        for i in 0..N {
-            pattern |= lsb(rays[i].pos.0 & occupancy);
-            pattern |= msb(rays[i].neg.0 & occupancy);
-        }
-        Bitboard(pattern)
-    }
-
     // TODO: pawn moves with blocking can be done with rays and collision testing
     pub fn pawn_move(&self, player: Color, target: Bitboard) -> Bitboard {
         let potential_attackers = REV_PAWN_MOVES[player as usize][target];
@@ -179,9 +168,9 @@ impl Board {
             }
             King => KING_ATTACKS[target],
             Knight => KNIGHT_ATTACKS[target],
-            Bishop => self.linear_attackers(player, &BISHOP_RAYS[target]),
-            Rook => self.linear_attackers(player, &ROOK_RAYS[target]),
-            Queen => self.linear_attackers(player, &QUEEN_RAYS[target]),
+            Bishop => self.bishop_reach(target),
+            Rook => self.rook_reach(target),
+            Queen => self.queen_reach(target),
         };
         potential_attackers & self[player] & self[piece]
     }
