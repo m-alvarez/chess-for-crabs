@@ -8,10 +8,11 @@ use Line::*;
 const fn precompute_ranks() -> SquareIndex<Bitboard> {
     let mut ranks = SquareIndex::new();
     const_for!(y in 0 .. 8 => {
-        let mask = 0b11111111 << (8 * y);
         const_for!(x in 0 .. 8 => {
             let pt = Bitboard::at(Square::xy(x, y));
-            *ranks.get_mut(pt) = Bitboard(mask);
+            const_for!(x1 in 0 .. 8 => {
+                ranks.get_mut(pt).0 |= Bitboard::at(Square::xy(x1, y)).0;
+            })
         });
     });
     ranks
@@ -20,10 +21,11 @@ const fn precompute_ranks() -> SquareIndex<Bitboard> {
 const fn precompute_files() -> SquareIndex<Bitboard> {
     let mut files = SquareIndex::new();
     const_for!(x in 0 .. 8 => {
-        let mask = 0x0101010101010101 << x;
         const_for!(y in 0 .. 8 => {
             let pt = Bitboard::at(Square::xy(x, y));
-            *files.get_mut(pt) = Bitboard(mask);
+            const_for!(y1 in 0 .. 8 => {
+                files.get_mut(pt).0 |= Bitboard::at(Square::xy(x, y1)).0;
+            })
         });
     });
     files
@@ -60,12 +62,11 @@ const fn precompute_diagonals(delta: i32) -> SquareIndex<Bitboard> {
     const_for!(x0 in 0 .. 8 => {
         const_for!(y0 in 0 .. 8 => {
             let pt = Bitboard::at(Square::xy(x0, y0));
-            let mut x: i32 = x0;
-            let mut y: i32 = y0;
-            const_for!(i in 0 .. 8 => {
-                diagonals.get_mut(pt).0 |= Bitboard::at(Square::xy(x, y)).0;
-                x = (x + 1) % 8;
-                y = (y + delta).rem_euclid(8);
+            const_for!(x1 in 0 .. 8 => {
+                let y1 = y0 + (x1 - x0) * delta;
+                if y1 >= 0 && y1 < 8 {
+                    diagonals.get_mut(pt).0 |= Bitboard::at(Square::xy(x1, y1)).0;
+                }
             })
         })
     });
