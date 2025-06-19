@@ -1,38 +1,30 @@
-use std::num::Wrapping;
 use std::arch::asm;
+use std::num::Wrapping;
 
 #[macro_export]
 macro_rules! const_for {
     ($var:ident in $range:expr => $body:stmt) => {
         {
+            assert!($range.start <= $range.end);
             let mut $var = $range.start;
-            if ($range.end >= $range.start) {
-                while $var < $range.end {
-                    $body
-                    $var = $var + 1
-                }
-            } else {
-                while $var >= $range.end {
-                    $body
-                    $var = $var - 1
-                }
+            while $var < $range.end {
+                $body
+                $var = $var + 1
             }
         }
-    }
+    };
 }
 
 #[macro_export]
 macro_rules! const_foreach {
-    ($var:pat in $arr:expr => $body:stmt) => {
-        {
-            let mut i = 0;
-            while i < $arr.len() {
-                let $var = $arr[i];
-                i += 1;
-                $body
-            }
+    ($var:pat in $arr:expr => $body:stmt) => {{
+        let mut i = 0;
+        while i < $arr.len() {
+            let $var = $arr[i];
+            i += 1;
+            $body
         }
-    }
+    }};
 }
 
 pub fn lsb(b: u64) -> u64 {

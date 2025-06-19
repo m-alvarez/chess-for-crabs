@@ -44,7 +44,9 @@ const fn precompute_rank_attacks() -> [[Bitboard; 64]; 8] {
                     break;
                 }
             });
-            const_for!(i in rook_file-1 .. 0 => {
+            const_for!(ri in 0 .. rook_file => {
+                // Beware the reverse iteration
+                let i = rook_file - ri - 1;
                 let bit = 1 << (7 - i);
                 attack_bb.0 |= bit;
                 if real_pattern & bit != 0 {
@@ -75,7 +77,7 @@ const fn precompute_diagonals(delta: i32) -> SquareIndex<Bitboard> {
 
 pub const RANKS: SquareIndex<Bitboard> = precompute_ranks();
 pub const FILES: SquareIndex<Bitboard> = precompute_files();
-// BEWARE: this is NOT a SquareIndex, as it's indexed by compressed rank occupancy patterns
+// BEWARE: this is NOT a SquareIndex, as it's indexed by reduced rank occupancy patterns
 pub const RANK_ATTACKS: [[Bitboard; 64]; 8] = precompute_rank_attacks();
 pub const NW_DIAGONALS: SquareIndex<Bitboard> = precompute_diagonals(1);
 pub const SW_DIAGONALS: SquareIndex<Bitboard> = precompute_diagonals(-1);
@@ -89,7 +91,7 @@ impl SquareIndex<Bitboard> {
     }
 }
 
-impl <T> SquareIndex<T> {
+impl<T> SquareIndex<T> {
     const fn get(&self, bb: Bitboard) -> &T {
         &self.0[bb.to_index()]
     }
@@ -98,7 +100,7 @@ impl <T> SquareIndex<T> {
     }
 }
 
-impl <T> Index<Bitboard> for SquareIndex<T> {
+impl<T> Index<Bitboard> for SquareIndex<T> {
     type Output = T;
     fn index(&self, bb: Bitboard) -> &Self::Output {
         debug_assert_eq!(bb.0.count_ones(), 1);
@@ -106,24 +108,27 @@ impl <T> Index<Bitboard> for SquareIndex<T> {
     }
 }
 
-impl <T> IndexMut<Bitboard> for SquareIndex<T> {
+impl<T> IndexMut<Bitboard> for SquareIndex<T> {
     fn index_mut(&mut self, bb: Bitboard) -> &mut T {
         debug_assert_eq!(bb.0.count_ones(), 1);
         self.get_mut(bb)
     }
 }
 
+#[rustfmt::skip]
 const KNIGHT_JUMPS: [(i32, i32); 8] = [
-    (-1, -2),
-    (-1, 2),
-    (1, -2),
-    (1, 2),
-    (-2, -1),
-    (-2, 1),
-    (2, -1),
-    (2, 1),
+             (-1,  2), (1,  2),
+    (-2,  1),                  (2,  1),
+
+    (-2, -1),                  (2, -1),
+             (-1, -2), (1, -2),
 ];
-const KING_JUMPS: [(i32, i32); 8] = [N, S, E, W, NE, SE, NW, SW];
+#[rustfmt::skip]
+const KING_JUMPS: [(i32, i32); 8] = [
+    (-1,  1), (0,  1), (1,  1),
+    (-1,  0),          (1,  0),
+    (-1, -1), (0, -1), (1, -1),
+];
 pub const KNIGHT_ATTACKS: SquareIndex<Bitboard> = precompute_jump_attacks(&KNIGHT_JUMPS);
 pub const KING_ATTACKS: SquareIndex<Bitboard> = precompute_jump_attacks(&KING_JUMPS);
 
