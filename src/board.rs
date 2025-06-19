@@ -133,8 +133,10 @@ impl Board {
 
     pub fn apply_castle(&self, info: &CastleInfo) -> Board {
         let mut new = *self;
-        new[Rook] = new[Rook] & !info.delete | info.add_rook;
-        new[King] = info.add_king;
+        new[Rook] = (new[Rook] & !info.delete) | info.add_rook;
+        new[King] = (new[King] & !info.delete) | info.add_king;
+        new[self.player] = (new[self.player] & !info.delete) | info.add_rook | info.add_king;
+        new.player = self.player.opponent();
         new
     }
 
@@ -293,7 +295,7 @@ impl Board {
     }
 
     fn check_castle_move(&self, path: Bitboard, mid_square: Bitboard) -> Result<(), IllegalMove> {
-        if (path & (self[Black] | self[White])).is_populated() {
+        if (path & self.occupancy()).is_populated() {
             return Err(IllegalMove::CastlingThroughPiece);
         }
         if self
