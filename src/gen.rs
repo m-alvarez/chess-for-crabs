@@ -1,11 +1,8 @@
 use crate::bitboard::{Bitboard, LINE_AT_Y};
 use crate::board::Board;
 use crate::moves::{Move, SimpleMove};
-use crate::patterns::{
-    FILES, KING_ATTACKS, KNIGHT_ATTACKS, NW_DIAGONALS, PAWN_ATTACKS, PAWN_DOUBLE_MOVES,
-    PAWN_EP_INFO, PAWN_SINGLE_MOVES, RANK_ATTACKS, SW_DIAGONALS,
-};
-use crate::piece::{Color, Piece};
+use crate::patterns::*;
+use crate::piece::Piece;
 
 #[derive(Copy, Clone)]
 struct OccupancyIterator(Bitboard);
@@ -47,7 +44,7 @@ impl Board {
         let rank_occupancy: u64 = (occupancy.0 & (0b11111111 << rank_shift)) >> rank_shift;
         let rank_occupancy_reduced = ((rank_occupancy & 0b01111110) >> 1) as usize;
         let rank_attacks =
-            Bitboard(RANK_ATTACKS[rook_file][rank_occupancy_reduced].0 << rank_shift);
+            Bitboard(RANK_ATTACKS[rook_file as usize][rank_occupancy_reduced].0 << rank_shift);
 
         let file_mask = FILES[rook_position];
         let file_attacks = Board::hyperbola_quintessence(occupancy, rook_position, file_mask);
@@ -118,7 +115,8 @@ impl Board {
                 add: tgt,
             }))
         }
-        let ep_info = PAWN_EP_INFO[self.player as usize][self.en_passant as usize];
+        // TODO: Get rid of this nonsensical en passant indexing
+        let ep_info = PAWN_EP_INFO[self.player as usize][(8 - self.en_passant.leading_zeros()) as usize];
         // I can't see a way to do e.p. without an extra conditional
         if (ep_info.source_squares & pos).is_populated() {
             process_move(Move::Simple(SimpleMove {

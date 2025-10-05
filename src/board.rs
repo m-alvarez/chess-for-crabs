@@ -2,8 +2,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
 
 use crate::bitboard::{Bitboard, LINE_AT_X, LINE_AT_Y};
-use crate::coords::Square;
-use crate::moves::{AlgebraicMove, Move, SimpleAlgebraicMove, SimpleMove};
+use crate::moves::{AlgebraicMove, Move, SimpleAlgebraicMove, SimpleMove, Square};
 use crate::piece::{Color, Piece};
 use Color::*;
 use Piece::*;
@@ -202,13 +201,12 @@ impl Board {
                 let piece = *Piece::list().iter().find(|piece| {
                     (mv.delete & self[self.player] & self[**piece]).is_populated()
                 }).unwrap_or(&mv.piece);
-                let (dst_x, dst_y) = mv.add.coords();
-                let dst_square = Square::xy(dst_x as i32, dst_y as i32);
                 let captures = (mv.delete & self[self.player.opponent()]).is_populated();
+                let (dst_x, dst_y) = mv.add.coords();
                 Some(AlgebraicMove::Simple(SimpleAlgebraicMove {
                     piece,
                     disambiguate: (None, None),
-                    dst_square,
+                    dst_square: Square::xy(dst_x, dst_y),
                     captures,
                     check: false,
                     checkmate: false,
@@ -240,7 +238,7 @@ impl Board {
         }
         // This doesn't have to be fast, since the machine never generates AlgebraicMove
         // objects
-        let dst_bb = Bitboard::at(mv.dst_square);
+        let dst_bb = Bitboard::at(mv.dst_square.x, mv.dst_square.y);
         if (dst_bb & self[self.player]).is_populated() {
             return Err(IllegalMove::OccupiedSquare);
         }

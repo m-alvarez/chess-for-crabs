@@ -4,7 +4,6 @@ use std::ops::{BitAndAssign, BitOrAssign, BitXorAssign};
 
 use std::arch::x86_64::_popcnt64;
 
-use crate::coords::Square;
 use crate::piece::{Color, Piece};
 use Color::*;
 use Piece::*;
@@ -33,8 +32,7 @@ impl Debug for Bitboard {
         for y in (0..8).rev() {
             write!(fmt, "{} ", y + 1)?;
             for x in 0..8 {
-                let square = Square::xy(x, y);
-                let intersection = *self & Bitboard::at(square);
+                let intersection = *self & Bitboard::at(x, y);
                 write!(fmt, "{}", intersection.popcnt())?;
                 write!(fmt, "{}", if x == 7 { "\n" } else { " " })?;
             }
@@ -128,18 +126,25 @@ impl Bitboard {
     }
 
     pub const fn to_index(self) -> usize {
-        self.0.ilog2() as usize
+        let result = self.0.ilog2() as usize;
+        assert!(Bitboard::of_index(result).0 == self.0);
+        result
     }
 
-    pub const fn rank(self) -> usize {
-        7 - (self.to_index() >> 3)
+    pub const fn of_index(idx: usize) -> Self {
+        assert!(idx < 64);
+        Bitboard(1 << idx)
     }
 
-    pub const fn file(self) -> usize {
-        7 - (self.to_index() & 7)
+    pub const fn rank(self) -> u8 {
+        7 - (self.to_index() >> 3) as u8
     }
 
-    pub const fn coords(self) -> (usize, usize) {
+    pub const fn file(self) -> u8 {
+        7 - (self.to_index() & 7) as u8
+    }
+
+    pub const fn coords(self) -> (u8, u8) {
         (self.file(), self.rank())
     }
 
@@ -181,8 +186,18 @@ impl Bitboard {
         unsafe { _popcnt64(self.0 as i64) }
     }
 
-    pub const fn at(point: Square) -> Bitboard {
-        Bitboard(1 << (63 - point.x - point.y * 8))
+    pub const fn at(x: u8, y: u8) -> Bitboard {
+        assert!(x < 8);
+        assert!(y < 8);
+        Bitboard(1 << (63 - x - y * 8))
+    }
+
+    pub const fn at_checked(x: i32, y: i32) -> Option<Bitboard> {
+        if x < 0 || x >= 8 || y < 0 || y >= 8 {
+            None
+        } else {
+            Some(Bitboard::at(x as u8, y as u8))
+        }
     }
 
     pub const fn union<const N: usize>(boards: [Bitboard; N]) -> Bitboard {
@@ -209,9 +224,9 @@ mod tests {
     fn bb_rank_file() {
         for x in 0..8 {
             for y in 0..8 {
-                let bb = Bitboard::at(Square::xy(x, y));
-                assert!(bb.file() == x as usize);
-                assert!(bb.rank() == y as usize);
+                let bb = Bitboard::at(x, y);
+                assert!(bb.file() == x);
+                assert!(bb.rank() == y);
             }
         }
     }

@@ -1,6 +1,5 @@
 use crate::bitboard::Bitboard;
 use crate::board::Board;
-use crate::coords::Square;
 use crate::game::Game;
 use crate::move_log::MoveLog;
 use crate::piece::Color::*;
@@ -51,7 +50,7 @@ fn read_fen_board(s: &str) -> Option<Board> {
             let y = 7 - i / 9;
             let piece = char_piece(chr)?;
             let color = char_color(chr)?;
-            let bb = Bitboard::at(Square::xy_checked(x as i32, y as i32)?);
+            let bb = Bitboard::at_checked(x as i32, y as i32)?;
             board[piece] |= bb;
             board[color] |= bb;
             i += 1
@@ -86,9 +85,9 @@ fn read_en_passant(s: &str) -> Option<u8> {
     }
     let mut chars = s.chars();
     let file = chars.next()?;
-    let rank = chars.next()?;
-    let sq = Square::algebraic(file, rank.to_digit(10)? as u8)?;
-    Some(1 << sq.x)
+    let _ = chars.next()?;
+    let file_num = file as i32 - 'a' as i32;
+    Some(1 << file_num)
 }
 
 pub fn parse(s: &str) -> Option<Game> {
@@ -132,7 +131,7 @@ fn serialize_board(out: &mut Formatter, b: &Board) -> Result {
     for y in (0..8).rev() {
         let mut empty_spaces = 0;
         for x in 0..8 {
-            let square = Bitboard::at(Square::xy(x, y));
+            let square = Bitboard::at(x, y);
             let color = if (square & b[White]).is_populated() {
                 White
             } else if (square & b[Black]).is_populated() {

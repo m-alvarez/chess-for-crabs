@@ -2,7 +2,6 @@ use std::fmt::{Display, Formatter};
 use std::iter::Peekable;
 
 use crate::bitboard::Bitboard;
-use crate::coords::Square;
 use crate::piece::Piece;
 use crate::piece::Piece::*;
 
@@ -19,6 +18,24 @@ pub enum Move {
     Simple(SimpleMove),
     CastleLong,
     CastleShort,
+}
+
+#[derive(Copy, Clone)]
+pub struct Square {
+    pub x: u8,
+    pub y: u8,
+}
+
+impl Square {
+    pub fn xy(x: u8, y: u8) -> Square {
+        Square { x, y }
+    }
+}
+
+impl std::fmt::Display for Square {
+    fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {
+        write!(fmt, "{}{}", (self.x + 'a' as u8) as char, self.y + 1)
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -161,7 +178,7 @@ impl AlgebraicMove {
         let mut mv = SimpleAlgebraicMove {
             piece: Pawn,
             disambiguate: (None, None),
-            dst_square: Square { x: 0, y: 0 },
+            dst_square: Square::xy(0, 0),
             captures: false,
             check: false,
             checkmate: false,
@@ -184,7 +201,7 @@ impl AlgebraicMove {
         // Consume dst
         match (try_rank(&mut tokens), try_file(&mut tokens)) {
             // remember it's backwards
-            (Some(y), Some(x)) => mv.dst_square = Square::xy(x, y),
+            (Some(y), Some(x)) => mv.dst_square = Square::xy(x as u8, y as u8),
             _ => return None,
         }
         // Consume capture mark

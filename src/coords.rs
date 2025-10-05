@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Display, Formatter};
 
+/*
 #[derive(Copy, Clone)]
 pub struct Square {
     pub x: u8,
@@ -43,6 +44,7 @@ impl Debug for Square {
         write!(fmt, "({}, {})", self.x, self.y)
     }
 }
+*/
 
 pub const E: (i32, i32) = (1, 0);
 pub const NE: (i32, i32) = (1, 1);

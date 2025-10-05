@@ -2,7 +2,7 @@
 use std::io::{BufRead, Write};
 
 use args::{print_usage, Args};
-use chess_for_crabs::*;
+use chess_for_crabs::{bitboard::Bitboard, patterns::KNIGHT_ATTACKS, piece::Color, *};
 use fen;
 use game::Game;
 use moves::AlgebraicMove;
@@ -35,6 +35,7 @@ fn play_from(mut game: Game) {
     let mut out = stdout.lock();
     let mut buffer = String::new();
 
+    println!("{:?}", KNIGHT_ATTACKS[Bitboard::at(2, 2)]);
     loop {
         println!("{}", game.board.fen());
         writeln!(&mut out, "").unwrap();
