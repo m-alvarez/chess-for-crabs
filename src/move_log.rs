@@ -1,5 +1,5 @@
-use std::fmt::{Display, Result, Formatter};
 use crate::moves::AlgebraicMove;
+use std::fmt::{Display, Formatter, Result};
 
 pub struct MoveLog {
     pub ply: i64,
@@ -8,11 +8,14 @@ pub struct MoveLog {
 
 impl MoveLog {
     pub fn new() -> Self {
-        MoveLog { ply: 0, moves: Vec::new() }
+        MoveLog {
+            ply: 0,
+            moves: Vec::new(),
+        }
     }
 
     pub fn append(&mut self, mv: AlgebraicMove) {
-        self.ply += 1; 
+        self.ply += 1;
         self.moves.push(mv)
     }
 }

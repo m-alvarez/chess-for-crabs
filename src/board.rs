@@ -1,8 +1,8 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, IndexMut};
 
-use crate::bitboard::Bitboard;
-use crate::coords::Line;
+use crate::bitboard::{Bitboard, LINE_AT_X, LINE_AT_Y};
+use crate::coords::Square;
 use crate::moves::{AlgebraicMove, Move, SimpleAlgebraicMove, SimpleMove};
 use crate::piece::{Color, Piece};
 use Color::*;
@@ -124,6 +124,7 @@ impl Board {
         new[self.player] |= mv.add;
         new.player = self.player.opponent();
         let new_pawn = new[Pawn] & !self[Pawn];
+        // TODO: branchless version is possible via shifts
         new.en_passant = match self.player {
             Black => (((new_pawn.0 >> 16) & mv.delete.0) >> 8) as u8,
             White => (((new_pawn.0 << 16) & mv.delete.0) >> 48) as u8,
@@ -186,6 +187,41 @@ impl Board {
         pattern
     }
 
+    pub fn to_algebraic(&self, mv: Move) -> Option<AlgebraicMove> {
+        // TODO: this does not correctly set check/checkmate flags
+        match mv {
+            Move::CastleShort => Some(AlgebraicMove::CastleShort {
+                check: false,
+                checkmate: false,
+            }),
+            Move::CastleLong => Some(AlgebraicMove::CastleLong {
+                check: false,
+                checkmate: false,
+            }),
+            Move::Simple(mv) => {
+                let piece = *Piece::list().iter().find(|piece| {
+                    (mv.delete & self[self.player] & self[**piece]).is_populated()
+                }).unwrap_or(&mv.piece);
+                let (dst_x, dst_y) = mv.add.coords();
+                let dst_square = Square::xy(dst_x as i32, dst_y as i32);
+                let captures = (mv.delete & self[self.player.opponent()]).is_populated();
+                Some(AlgebraicMove::Simple(SimpleAlgebraicMove {
+                    piece,
+                    disambiguate: (None, None),
+                    dst_square,
+                    captures,
+                    check: false,
+                    checkmate: false,
+                    promotion: if piece != mv.piece {
+                        Some(mv.piece)
+                    } else {
+                        None
+                    },
+                }))
+            }
+        }
+    }
+
     pub fn is_pre_legal(&self, mv: &SimpleAlgebraicMove) -> Result<Move, IllegalMove> {
         let piece;
         if let Some(promote_to) = mv.promotion {
@@ -214,10 +250,10 @@ impl Board {
             self.pawn_move(self.player, dst_bb)
         };
         if let Some(file) = mv.disambiguate.0 {
-            attackers &= Bitboard::line(Line::AtX(file))
+            attackers &= LINE_AT_X[file as usize]
         }
         if let Some(rank) = mv.disambiguate.1 {
-            attackers &= Bitboard::line(Line::AtY(rank))
+            attackers &= LINE_AT_Y[rank as usize]
         }
 
         let captures = dst_bb & self[self.player.opponent()];
@@ -308,7 +344,7 @@ impl Board {
         }
     }
 
-    fn castle_long(&self) -> Result<Move, IllegalMove> {
+    pub fn castle_long(&self) -> Result<Move, IllegalMove> {
         if !self.long_castling_allowed(self.player) {
             return Err(IllegalMove::NoCastlingPermissions);
         }
@@ -320,7 +356,7 @@ impl Board {
         Ok(Move::CastleLong)
     }
 
-    fn castle_short(&self) -> Result<Move, IllegalMove> {
+    pub fn castle_short(&self) -> Result<Move, IllegalMove> {
         if !self.short_castling_allowed(self.player) {
             return Err(IllegalMove::NoCastlingPermissions);
         }
@@ -341,21 +377,16 @@ impl Board {
         attackers.is_populated()
     }
 
+    pub fn castling_allowed(&self, color: Color) -> bool {
+        0 != self.castling_rights & (0b11 << color as i8)
+    }
+
     pub fn short_castling_allowed(&self, color: Color) -> bool {
-        // Can be done jump-free if need be
-        0 != self.castling_rights
-            & match color {
-                White => 0b1000,
-                Black => 0b0010,
-            }
+        0 != self.castling_rights & (0b10 << color as i8)
     }
 
     pub fn long_castling_allowed(&self, color: Color) -> bool {
-        0 != self.castling_rights
-            & match color {
-                White => 0b0100,
-                Black => 0b0001,
-            }
+        0 != self.castling_rights & (0b01 << color as i8)
     }
 
     pub fn display(&self, w: &mut impl std::io::Write) -> std::io::Result<()> {

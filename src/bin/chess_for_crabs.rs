@@ -1,9 +1,9 @@
 #![feature(portable_simd)]
 use std::io::{BufRead, Write};
 
+use args::{print_usage, Args};
 use chess_for_crabs::*;
 use fen;
-use args::{Args, print_usage};
 use game::Game;
 use moves::AlgebraicMove;
 
@@ -45,6 +45,17 @@ fn play_from(mut game: Game) {
                 return;
             }
         }
+        game.board.for_each_pre_legal_move(&|mv| {
+            /*
+            println!("MOVE:");
+            println!("{mv:?}");
+*/
+            if let Some(alg) = game.board.to_algebraic(mv) {
+                println!("{alg}");
+            } else {
+                println!("ERROR: move is not algebraic");
+            }
+        });
         let (alg, mv) = try_read(&mut buffer, |s| {
             let alg = if let Some(alg) = AlgebraicMove::parse(s) {
                 alg
@@ -53,9 +64,7 @@ fn play_from(mut game: Game) {
             };
             let mv = match game.board.is_legal(&alg) {
                 Ok(mv) => mv,
-                Err(err) => {
-                    return Err(err.as_str())
-                }
+                Err(err) => return Err(err.as_str()),
             };
             Ok((alg, mv))
         })
@@ -117,6 +126,6 @@ fn main() {
             Some(game) => play_from(game),
             None => println!("Invalid FEN"),
         },
-        None => print_usage()
+        None => print_usage(),
     }
 }

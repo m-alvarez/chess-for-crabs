@@ -7,14 +7,14 @@ use crate::piece::Piece;
 use crate::piece::Piece::*;
 
 // Beware: in a promotion, `piece` is the type of the promoted piece
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct SimpleMove {
     pub delete: Bitboard,
     pub piece: Piece,
     pub add: Bitboard,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Move {
     Simple(SimpleMove),
     CastleLong,

@@ -1,9 +1,8 @@
-use crate::bitboard::Bitboard;
-use crate::coords::{Line, Square, E, N, NE, NW, S, SE, SW, W};
+use crate::bitboard::{Bitboard, LINE_AT_Y};
+use crate::coords::Square;
 use crate::piece::Color;
 use std::ops::{Index, IndexMut};
 use Color::*;
-use Line::*;
 
 const fn precompute_ranks() -> SquareIndex<Bitboard> {
     let mut ranks = SquareIndex::new();
@@ -150,6 +149,93 @@ const fn precompute_jump_attacks<const N: usize>(d: &[(i32, i32); N]) -> SquareI
     attacks
 }
 
+pub const PAWN_SINGLE_MOVES: [SquareIndex<Bitboard>; 2] = precompute_pawn_single_moves();
+pub const PAWN_DOUBLE_MOVES: [SquareIndex<Bitboard>; 2] = precompute_pawn_double_moves();
+pub const PAWN_ATTACKS: [SquareIndex<Bitboard>; 2] = precompute_pawn_attacks();
+
+#[derive(Copy, Clone)]
+pub struct EPInfo {
+    pub source_squares: Bitboard,
+    pub target_square: Bitboard,
+    pub kill_square: Bitboard,
+}
+pub const PAWN_EP_INFO: [[EPInfo; 9]; 2] = precompute_pawn_ep_info();
+
+const fn precompute_pawn_ep_info() -> [[EPInfo; 9]; 2] {
+    let mut infos = [[EPInfo {
+        source_squares: Bitboard::empty(),
+        target_square: Bitboard::empty(),
+        kill_square: Bitboard::empty(),
+    }; 9]; 2];
+
+    const_for!(x in 0 .. 8 => {
+        const_foreach!((color, home_rank, dy) in [(White, 1, 1), (Black, 6, 1)] => {
+            let mut source_squares = Bitboard::empty().0;
+            const_foreach!(dx in [-1, 1] => {
+                if let Some(source) = Square::xy_checked(x + dx, home_rank) {
+                    source_squares |= Bitboard::at(source).0;
+                }
+            });
+            let target_square = Bitboard::at(Square::xy(x, home_rank + dy)).0;
+            let kill_square = Bitboard::at(Square::xy(x, home_rank)).0;
+            infos[color as usize][x as usize + 1] = EPInfo {
+                source_squares: Bitboard(source_squares),
+                target_square: Bitboard(target_square),
+                kill_square: Bitboard(kill_square)
+            };
+        });
+    });
+    infos
+}
+
+const fn precompute_pawn_single_moves() -> [SquareIndex<Bitboard>; 2] {
+    let mut moves = [SquareIndex::new(); 2];
+    const_for!(x in 0 .. 8 => {
+        const_for!(y in 0 .. 8 => {
+            const_foreach!((color, dy) in [(White, 1), (Black, -1)] => {
+                let idx = Square::xy(x, y).index();
+                let pat = if let Some(sq) = Square::xy_checked(x, y + dy) {
+                    Bitboard::at(sq).0
+                } else { 0 };
+                moves[color as usize].0[idx as usize] = Bitboard(pat);
+            });
+        });
+    });
+    moves
+}
+
+const fn precompute_pawn_double_moves() -> [SquareIndex<Bitboard>; 2] {
+    let mut moves = [SquareIndex::new(); 2];
+    const_for!(x in 0 .. 8 => {
+        const_foreach!((color, home_rank, dy) in [(White, 1, 1), (Black, 6, -1)] => {
+            let idx = Square::xy(x, home_rank).index();
+            let pat = Bitboard::at(Square::xy(x, home_rank + dy + dy)).0;
+            moves[color as usize].0[idx as usize] = Bitboard(pat)
+        });
+    });
+    moves
+}
+
+const fn precompute_pawn_attacks() -> [SquareIndex<Bitboard>; 2] {
+    let mut attacks = [SquareIndex::new(); 2];
+    const_for!(x in 0 .. 8 => {
+        const_for!(y in 0 .. 8 => {
+            let idx = Square::xy(x, y).index();
+            const_foreach!((color, dy) in [(White, 1), (Black, -1)] => {
+                let mut pat = 0;
+                if let Some(square) = Square::xy_checked(x + 1, y + dy) {
+                    pat |= Bitboard::at(square).0;
+                }
+                if let Some(square) = Square::xy_checked(x - 1, y + dy) {
+                    pat |= Bitboard::at(square).0;
+                }
+                attacks[color as usize].0[idx as usize] = Bitboard(pat);
+            });
+        });
+    });
+    attacks
+}
+
 pub const REV_PAWN_MOVES: [SquareIndex<Bitboard>; 2] = precompute_rev_pawn_moves();
 pub const REV_PAWN_DBL_MOVES: [SquareIndex<Bitboard>; 2] = precompute_rev_pawn_dbl_moves();
 pub const REV_PAWN_ATTACKS: [SquareIndex<Bitboard>; 2] = precompute_rev_pawn_attacks();
@@ -219,9 +305,9 @@ const fn precompute_rev_pawn_dbl_moves() -> [SquareIndex<Bitboard>; 2] {
         const_for!(y in 0 .. 8 => {
             let idx = (63 - x - y * 8) as u64;
             let bb = 1 << idx;
-            let white_pat = bb << 16 & Bitboard::line(AtY(1)).0;
+            let white_pat = bb << 16 & LINE_AT_Y[1].0;
             rev_moves[White as usize].0[idx as usize] = Bitboard(white_pat);
-            let black_pat = bb >> 16 & Bitboard::line(AtY(6)).0;
+            let black_pat = bb >> 16 & LINE_AT_Y[6].0;
             rev_moves[Black as usize].0[idx as usize] = Bitboard(black_pat);
         });
     });

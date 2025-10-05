@@ -4,11 +4,27 @@ use std::ops::{BitAndAssign, BitOrAssign, BitXorAssign};
 
 use std::arch::x86_64::_popcnt64;
 
-use crate::coords::{Line, Square};
+use crate::coords::Square;
 use crate::piece::{Color, Piece};
 use Color::*;
 use Piece::*;
 
+/*
+ * BITBOARD REPRESENTATION
+ * aka you made your bed, now lie in it
+ *
+ * 8 07 06 05 04 03 02 01 00
+ * 7 15 14 13 12 11 10 09 08
+ * 6 ...
+ * 5 ...
+ * 4 ...
+ * 3 ...
+ * 2 ...
+ * 1 63 62 61 60 59 58 57 56
+ *    A  B  C  D  E  F  G  H
+ * TODO: make this make sense
+ *
+ */
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Bitboard(pub u64);
 
@@ -84,7 +100,7 @@ impl Sub for Bitboard {
     }
 }
 
-static LINE_AT_Y: [Bitboard; 8] = [
+pub static LINE_AT_Y: [Bitboard; 8] = [
     Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b11111111]),
     Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0b11111111, 0]),
     Bitboard::from_bytes([0, 0, 0, 0, 0, 0b11111111, 0, 0]),
@@ -95,7 +111,7 @@ static LINE_AT_Y: [Bitboard; 8] = [
     Bitboard::from_bytes([0b11111111, 0, 0, 0, 0, 0, 0, 0]),
 ];
 
-static LINE_AT_X: [Bitboard; 8] = [
+pub static LINE_AT_X: [Bitboard; 8] = [
     Bitboard::from_bytes([0b10000000; 8]),
     Bitboard::from_bytes([0b01000000; 8]),
     Bitboard::from_bytes([0b00100000; 8]),
@@ -169,13 +185,6 @@ impl Bitboard {
         Bitboard(1 << (63 - point.x - point.y * 8))
     }
 
-    pub const fn line(l: Line) -> Bitboard {
-        match l {
-            Line::AtX(x) => LINE_AT_X[x as usize],
-            Line::AtY(y) => LINE_AT_Y[y as usize],
-        }
-    }
-
     pub const fn union<const N: usize>(boards: [Bitboard; N]) -> Bitboard {
         let mut pattern: u64 = 0;
         const_for!(i in 0 .. N => {
@@ -198,8 +207,8 @@ mod tests {
 
     #[test]
     fn bb_rank_file() {
-        for x in 0 .. 8 {
-            for y in 0 .. 8 {
+        for x in 0..8 {
+            for y in 0..8 {
                 let bb = Bitboard::at(Square::xy(x, y));
                 assert!(bb.file() == x as usize);
                 assert!(bb.rank() == y as usize);

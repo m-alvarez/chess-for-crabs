@@ -1,7 +1,9 @@
-use crate::bitboard::Bitboard;
+use crate::bitboard::{Bitboard, LINE_AT_Y};
 use crate::board::Board;
+use crate::moves::{Move, SimpleMove};
 use crate::patterns::{
-    FILES, KING_ATTACKS, KNIGHT_ATTACKS, NW_DIAGONALS, RANK_ATTACKS, SW_DIAGONALS,
+    FILES, KING_ATTACKS, KNIGHT_ATTACKS, NW_DIAGONALS, PAWN_ATTACKS, PAWN_DOUBLE_MOVES,
+    PAWN_EP_INFO, PAWN_SINGLE_MOVES, RANK_ATTACKS, SW_DIAGONALS,
 };
 use crate::piece::{Color, Piece};
 
@@ -35,7 +37,6 @@ impl Board {
         mask & (fwd ^ rev)
     }
 
-    #[inline(never)]
     pub fn rook_reach(&self, rook_position: Bitboard) -> Bitboard {
         // At this point I realize my grasp on the correspondence between bits and squares is rather
         // tenuous.
@@ -54,7 +55,6 @@ impl Board {
         rank_attacks | file_attacks
     }
 
-    #[inline(never)]
     pub fn bishop_reach(&self, bishop_position: Bitboard) -> Bitboard {
         let occupancy = self.occupancy();
 
@@ -78,7 +78,136 @@ impl Board {
         self.bishop_reach(queen_position) | self.rook_reach(queen_position)
     }
 
-    fn piece_positions(&self, piece: Piece, color: Color) -> OccupancyIterator {
-        OccupancyIterator(self[color] & self[piece])
+    fn for_each_pawn_advance(&self, pos: Bitboard, process_move: &impl Fn(Move)) {
+        let mv_tgt = PAWN_SINGLE_MOVES[self.player as usize][pos];
+        if (mv_tgt & !self.occupancy()).is_populated() {
+            // Check whether we've reached the last rank
+            let pieces: &[Piece] = if (mv_tgt & (LINE_AT_Y[0] | LINE_AT_Y[7])).is_populated() {
+                println!("MOVE TARGET: {:b}", mv_tgt.0);
+                &[Piece::Knight, Piece::Bishop, Piece::Rook, Piece::Queen]
+            } else {
+                &[Piece::Pawn]
+            };
+            for piece in pieces {
+                process_move(Move::Simple(SimpleMove {
+                    delete: pos | mv_tgt,
+                    piece: *piece,
+                    add: mv_tgt,
+                }))
+            }
+            // We do the double moves here since we already know the intermediate
+            // square was unoccupied
+            let mv2_tgt = PAWN_DOUBLE_MOVES[self.player as usize][pos];
+            if (mv2_tgt & !self.occupancy()).is_populated() {
+                process_move(Move::Simple(SimpleMove {
+                    delete: pos | mv2_tgt,
+                    piece: Piece::Pawn,
+                    add: mv2_tgt,
+                }))
+            }
+        }
+    }
+
+    fn for_each_pawn_capture(&self, pos: Bitboard, process_move: &impl Fn(Move)) {
+        let cap_tgt = PAWN_ATTACKS[self.player as usize][pos];
+        // At most 2 captures; one on each side
+        for tgt in (cap_tgt & self[self.player.opponent()]).occupied().take(2) {
+            process_move(Move::Simple(SimpleMove {
+                delete: pos | tgt,
+                piece: Piece::Pawn,
+                add: tgt,
+            }))
+        }
+        let ep_info = PAWN_EP_INFO[self.player as usize][self.en_passant as usize];
+        // I can't see a way to do e.p. without an extra conditional
+        if (ep_info.source_squares & pos).is_populated() {
+            process_move(Move::Simple(SimpleMove {
+                delete: pos | ep_info.kill_square,
+                piece: Piece::Pawn,
+                add: ep_info.target_square,
+            }))
+        }
+    }
+
+    pub fn for_each_pawn_move(&self, process_move: &impl Fn(Move)) {
+        for pawn_pos in (self[self.player] & self[Piece::Pawn]).occupied() {
+            self.for_each_pawn_advance(pawn_pos, process_move);
+            self.for_each_pawn_capture(pawn_pos, process_move);
+        }
+    }
+
+    pub fn for_each_knight_move(&self, process_move: &impl Fn(Move)) {
+        for knight_pos in (self[self.player] & self[Piece::Knight]).occupied() {
+            for tgt in (self.knight_reach(knight_pos) & !self[self.player]).occupied() {
+                process_move(Move::Simple(SimpleMove {
+                    delete: knight_pos | tgt,
+                    piece: Piece::Knight,
+                    add: tgt,
+                }))
+            }
+        }
+    }
+
+    pub fn for_each_bishop_move(&self, process_move: &impl Fn(Move)) {
+        for bishop_pos in (self[self.player] & self[Piece::Bishop]).occupied() {
+            for tgt in (self.bishop_reach(bishop_pos) & !self[self.player]).occupied() {
+                process_move(Move::Simple(SimpleMove {
+                    delete: bishop_pos | tgt,
+                    piece: Piece::Bishop,
+                    add: tgt,
+                }))
+            }
+        }
+    }
+
+    pub fn for_each_rook_move(&self, process_move: &impl Fn(Move)) {
+        for rook_pos in (self[self.player] & self[Piece::Rook]).occupied() {
+            for tgt in (self.rook_reach(rook_pos) & !self[self.player]).occupied() {
+                process_move(Move::Simple(SimpleMove {
+                    delete: rook_pos | tgt,
+                    piece: Piece::Rook,
+                    add: tgt,
+                }))
+            }
+        }
+    }
+    pub fn for_each_queen_move(&self, process_move: &impl Fn(Move)) {
+        for queen_pos in (self[self.player] & self[Piece::Queen]).occupied() {
+            for tgt in (self.queen_reach(queen_pos) & !self[self.player]).occupied() {
+                process_move(Move::Simple(SimpleMove {
+                    delete: queen_pos | tgt,
+                    piece: Piece::Queen,
+                    add: tgt,
+                }))
+            }
+        }
+    }
+    pub fn for_each_king_move(&self, process_move: &impl Fn(Move)) {
+        for king_pos in (self[self.player] & self[Piece::King]).occupied() {
+            if self.short_castling_allowed(self.player) {
+                self.castle_short().into_iter().for_each(process_move)
+            }
+            if self.long_castling_allowed(self.player) {
+                self.castle_long().into_iter().for_each(process_move)
+            }
+            for tgt in (self.king_reach(king_pos) & !self[self.player]).occupied() {
+                process_move(Move::Simple(SimpleMove {
+                    delete: king_pos | tgt,
+                    piece: Piece::King,
+                    add: tgt,
+                }))
+            }
+        }
+    }
+    // I can't come up with a way of abstracting this that's not potentially hard to
+    // optimize. Packing it into an iterator will add a bunch of indirection since
+    // we have to figure out what piece we're moving at runtime
+    pub fn for_each_pre_legal_move(&self, process_move: &impl Fn(Move)) {
+        self.for_each_pawn_move(process_move);
+        self.for_each_knight_move(process_move);
+        self.for_each_bishop_move(process_move);
+        self.for_each_rook_move(process_move);
+        self.for_each_queen_move(process_move);
+        self.for_each_king_move(process_move);
     }
 }

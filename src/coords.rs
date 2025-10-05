@@ -1,4 +1,4 @@
-use std::fmt::{Display, Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Copy, Clone)]
 pub struct Square {
@@ -41,28 +41,6 @@ impl Display for Square {
 impl Debug for Square {
     fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {
         write!(fmt, "({}, {})", self.x, self.y)
-    }
-}
-
-#[derive(Copy, Clone)]
-pub enum Line {
-    AtX(u8),
-    AtY(u8),
-}
-impl Display for Line {
-    fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {
-        match self {
-            Line::AtY(r) => write!(fmt, "{}", r + 1),
-            Line::AtX(f) => write!(fmt, "{}", (f + ('a' as u8)) as char),
-        }
-    }
-}
-impl Debug for Line {
-    fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {
-        match self {
-            Line::AtY(r) => write!(fmt, "(*, {})", r),
-            Line::AtX(f) => write!(fmt, "({}, *)", f),
-        }
     }
 }
 

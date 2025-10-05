@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter, Result};
 
-#[derive(PartialEq, Eq, Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum Piece {
     Pawn = 0,
     Knight = 1,
@@ -38,7 +38,12 @@ impl Piece {
     }
     pub fn to_unicode(self, color: Color) -> &'static str {
         let icons = [
-            ["♙", "♟"], ["♘", "♞"], ["♗", "♝"], ["♖", "♜"], ["♕", "♛"], ["♔", "♚"]
+            ["♙", "♟"],
+            ["♘", "♞"],
+            ["♗", "♝"],
+            ["♖", "♜"],
+            ["♕", "♛"],
+            ["♔", "♚"],
         ];
         icons[self as usize][color as usize]
     }
