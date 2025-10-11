@@ -1,5 +1,6 @@
 use crate::bitboard::{Bitboard, LINE_AT_Y};
 use crate::piece::Color;
+use std::fmt::Debug;
 use std::ops::{Index, IndexMut};
 use Color::*;
 
@@ -156,6 +157,14 @@ pub struct EPInfo {
     pub target_square: Bitboard,
     pub kill_square: Bitboard,
 }
+impl Debug for EPInfo {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(fmt, "Source:\n{:?}", self.source_squares)?;
+        writeln!(fmt, "Target:\n{:?}", self.target_square)?;
+        writeln!(fmt, "Kill:\n{:?}", self.kill_square)?;
+        Ok(())
+    }
+}
 /*
  * Indexed by file, or 8 if no en passant is possible
  */
@@ -170,15 +179,16 @@ const fn precompute_pawn_ep_info() -> [[EPInfo; 9]; 2] {
     }; 9]; 2];
 
     const_for!(x in 0 .. 8 => {
-        const_foreach!((color, home_rank, dy) in [(White, 1, 1), (Black, 6, 1)] => {
+        const_foreach!((color, opp_home_rank, dy) in [(White, 6, 1), (Black, 1, -1)] => {
             let mut source_squares = Bitboard::empty().0;
             const_foreach!(dx in [-1, 1] => {
-                if let Some(source) = Bitboard::at_checked(x + dx, home_rank) {
+                if let Some(source) =
+                    Bitboard::at_checked(x + dx, opp_home_rank - dy - dy) {
                     source_squares |= source.0;
                 }
             });
-            let target_square = Bitboard::at(x as u8, (home_rank + dy) as u8).0;
-            let kill_square = Bitboard::at(x as u8,home_rank as u8).0;
+            let target_square = Bitboard::at(x as u8, (opp_home_rank - dy) as u8).0;
+            let kill_square = Bitboard::at(x as u8, (opp_home_rank - dy - dy) as u8).0;
             infos[color as usize][x as usize] = EPInfo {
                 source_squares: Bitboard(source_squares),
                 target_square: Bitboard(target_square),
@@ -329,11 +339,5 @@ pub const SHORT_CASTLE_PATH: [Bitboard; 2] = [
     Bitboard::from_bytes([0b00000110, 0, 0, 0, 0, 0, 0, 0]),
     Bitboard::from_bytes([0, 0, 0, 0, 0, 0, 0, 0b00000110]),
 ];
-pub const LONG_CASTLE_MID_SQUARE: [Bitboard; 2] = [
-    Bitboard::at(3, 7),
-    Bitboard::at(3, 0),
-];
-pub const SHORT_CASTLE_MID_SQUARE: [Bitboard; 2] = [
-    Bitboard::at(5, 7),
-    Bitboard::at(5, 0),
-];
+pub const LONG_CASTLE_MID_SQUARE: [Bitboard; 2] = [Bitboard::at(3, 7), Bitboard::at(3, 0)];
+pub const SHORT_CASTLE_MID_SQUARE: [Bitboard; 2] = [Bitboard::at(5, 7), Bitboard::at(5, 0)];

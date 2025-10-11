@@ -19,4 +19,16 @@ impl Game {
         self.log.append(*alg);
         self.board = self.board.apply(mv)
     }
+
+    pub fn undo_last_move(&mut self) {
+        assert!(self.log.ply > 0);
+        self.log.ply -= 1;
+        self.log.moves.pop();
+        let mut new_board = Board::initial();
+        for alg in &self.log.moves {
+            let mv = new_board.is_legal(alg).unwrap();
+            new_board = new_board.apply(&mv)
+        }
+        self.board = new_board
+    }
 }

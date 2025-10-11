@@ -2,7 +2,7 @@
 use std::io::{BufRead, Write};
 
 use args::{print_usage, Args};
-use chess_for_crabs::{moves::Move, piece::Piece, *};
+use chess_for_crabs::{moves::Move, patterns::PAWN_EP_INFO, piece::Piece, *};
 use fen;
 use game::Game;
 use moves::AlgebraicMove;
@@ -34,6 +34,8 @@ enum Command {
     Move(AlgebraicMove),
     Quit,
     ShowMoves(Piece),
+    Eval,
+    Undo,
 }
 impl Command {
     fn parse(s: &str) -> Result<Command, &str> {
@@ -49,6 +51,8 @@ impl Command {
                         return Err("Invalid piece");
                     }
                 }
+                [b':', b'e'] => Command::Eval,
+                [b':', b'u'] => Command::Undo,
                 _ => return Err("I cannot parse that"),
             }
         })
@@ -80,19 +84,23 @@ fn play_from(mut game: Game) {
                     game.make_move(&alg, &mv);
                     println!("{}", game.log);
                     display(&game)
-                },
+                }
                 Err(err) => println!("{}", err.as_str()),
             },
             Command::Quit => return,
-            Command::ShowMoves(piece) => {
-                game.board.for_each_piece_move(piece, &|mv| {
-                    if let Some(alg) = game.board.to_algebraic(mv) {
-                        println!("{alg}")
-                    } else {
-                        println!("Non-algebraic: {mv:?}")
-                    }
-                })
-            },
+            Command::ShowMoves(piece) => game.board.for_each_piece_move(piece, &|mv| {
+                if let Some(alg) = game.board.to_algebraic(mv) {
+                    println!("{alg}")
+                } else {
+                    println!("Non-algebraic: {mv:?}")
+                }
+            }),
+            Command::Eval => todo!(),
+            Command::Undo => {
+                game.undo_last_move();
+                println!("{}", game.log);
+                display(&game)
+            }
         }
     }
 }

@@ -2,28 +2,28 @@ use crate::board::Board;
 use crate::piece::{Color, Piece};
 
 pub trait Evaluator {
-    fn evaluate(&self, board: &Board) -> f64;
+    fn evaluate(&self, board: &Board) -> u64;
 }
 
 pub struct MaterialCount();
-fn piece_value(p: Piece) -> f64 {
+fn piece_value(p: Piece) -> u64 {
     use Piece::*;
     match p {
-        Pawn => 1.,
-        Knight => 3.,
-        Bishop => 3.,
-        Rook => 5.,
-        Queen => 9.,
-        King => f64::INFINITY,
+        Pawn => 100,
+        Knight => 320,
+        Bishop => 330,
+        Rook => 500,
+        Queen => 900,
+        King => u32::max_value() as u64,
     }
 }
 impl Evaluator for MaterialCount {
-    fn evaluate(&self, board: &Board) -> f64 {
-        let mut count = 0.0;
+    fn evaluate(&self, board: &Board) -> u64 {
+        let mut count = 0;
         for piece in Piece::list() {
             let v = piece_value(*piece);
-            count += v * (board[*piece] & board[Color::White]).popcnt() as f64;
-            count -= v * (board[*piece] & board[Color::Black]).popcnt() as f64;
+            count += v * (board[*piece] & board[Color::White]).popcnt() as u64;
+            count -= v * (board[*piece] & board[Color::Black]).popcnt() as u64;
         }
         count
     }
