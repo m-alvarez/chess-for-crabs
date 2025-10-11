@@ -2,6 +2,7 @@ use crate::bitboard::Bitboard;
 use crate::board::Board;
 use crate::game::Game;
 use crate::move_log::MoveLog;
+use crate::patterns::NO_EN_PASSANT;
 use crate::piece::Color::*;
 use crate::piece::Piece::*;
 use crate::piece::{Color, Piece};
@@ -81,13 +82,13 @@ fn read_castling_rights(s: &str) -> Option<u8> {
 
 fn read_en_passant(s: &str) -> Option<u8> {
     if s == "-" {
-        return Some(0);
+        return Some(NO_EN_PASSANT);
     }
     let mut chars = s.chars();
     let file = chars.next()?;
     let _ = chars.next()?;
-    let file_num = file as i32 - 'a' as i32;
-    Some(1 << file_num)
+    let file_num = file as u8 - 'a' as u8;
+    Some(file_num)
 }
 
 pub fn parse(s: &str) -> Option<Game> {
@@ -188,10 +189,10 @@ fn serialize_castling_rights(out: &mut Formatter, board: &Board) -> Result {
 }
 
 fn serialize_en_passant(out: &mut Formatter, board: &Board) -> Result {
-    if board.en_passant == 0 {
+    if board.en_passant == NO_EN_PASSANT {
         write!(out, "-")
     } else {
-        let file = (board.en_passant.leading_zeros() + 'a' as u32) as u8 as char;
+        let file = (board.en_passant as u8 + 'a' as u8) as char;
         let rank = match board.player {
             White => 6,
             Black => 3,

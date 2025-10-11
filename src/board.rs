@@ -87,7 +87,7 @@ impl Board {
             player: White,
             half_moves: 0,
             castling_rights: 0b1111,
-            en_passant: 0,
+            en_passant: NO_EN_PASSANT,
         };
         for color in Color::list() {
             for piece in Piece::list() {
@@ -105,7 +105,7 @@ impl Board {
             player: White,
             half_moves: 0,
             castling_rights: 0,
-            en_passant: 0,
+            en_passant: NO_EN_PASSANT,
         }
     }
 
@@ -124,10 +124,11 @@ impl Board {
         new.player = self.player.opponent();
         let new_pawn = new[Pawn] & !self[Pawn];
         // TODO: branchless version is possible via shifts
-        new.en_passant = match self.player {
+        let ep_bitmap = match self.player {
             Black => (((new_pawn.0 >> 16) & mv.delete.0) >> 8) as u8,
             White => (((new_pawn.0 << 16) & mv.delete.0) >> 48) as u8,
         };
+        new.en_passant = ep_bitmap.leading_zeros() as u8;
         new
     }
 
@@ -165,8 +166,7 @@ impl Board {
         let potential_attackers = match piece {
             Pawn => {
                 REV_PAWN_ATTACKS[player as usize][target]
-                    | REV_PAWN_EP_ATTACKS[player as usize]
-                        [(8 - self.en_passant.leading_zeros()) as usize][target]
+                    | REV_PAWN_EP_ATTACKS[player as usize][self.en_passant as usize][target]
             }
             King => KING_ATTACKS[target],
             Knight => KNIGHT_ATTACKS[target],
@@ -198,9 +198,10 @@ impl Board {
                 checkmate: false,
             }),
             Move::Simple(mv) => {
-                let piece = *Piece::list().iter().find(|piece| {
-                    (mv.delete & self[self.player] & self[**piece]).is_populated()
-                }).unwrap_or(&mv.piece);
+                let piece = *Piece::list()
+                    .iter()
+                    .find(|piece| (mv.delete & self[self.player] & self[**piece]).is_populated())
+                    .unwrap_or(&mv.piece);
                 let captures = (mv.delete & self[self.player.opponent()]).is_populated();
                 let (dst_x, dst_y) = mv.add.coords();
                 Some(AlgebraicMove::Simple(SimpleAlgebraicMove {

@@ -101,14 +101,12 @@ impl<T> SquareIndex<T> {
 impl<T> Index<Bitboard> for SquareIndex<T> {
     type Output = T;
     fn index(&self, bb: Bitboard) -> &Self::Output {
-        debug_assert_eq!(bb.0.count_ones(), 1);
         self.get(bb)
     }
 }
 
 impl<T> IndexMut<Bitboard> for SquareIndex<T> {
     fn index_mut(&mut self, bb: Bitboard) -> &mut T {
-        debug_assert_eq!(bb.0.count_ones(), 1);
         self.get_mut(bb)
     }
 }
@@ -158,7 +156,11 @@ pub struct EPInfo {
     pub target_square: Bitboard,
     pub kill_square: Bitboard,
 }
+/*
+ * Indexed by file, or 8 if no en passant is possible
+ */
 pub const PAWN_EP_INFO: [[EPInfo; 9]; 2] = precompute_pawn_ep_info();
+pub const NO_EN_PASSANT: u8 = 8;
 
 const fn precompute_pawn_ep_info() -> [[EPInfo; 9]; 2] {
     let mut infos = [[EPInfo {
@@ -177,7 +179,7 @@ const fn precompute_pawn_ep_info() -> [[EPInfo; 9]; 2] {
             });
             let target_square = Bitboard::at(x as u8, (home_rank + dy) as u8).0;
             let kill_square = Bitboard::at(x as u8,home_rank as u8).0;
-            infos[color as usize][x as usize + 1] = EPInfo {
+            infos[color as usize][x as usize] = EPInfo {
                 source_squares: Bitboard(source_squares),
                 target_square: Bitboard(target_square),
                 kill_square: Bitboard(kill_square)
@@ -240,6 +242,9 @@ const fn precompute_pawn_attacks() -> [SquareIndex<Bitboard>; 2] {
 pub const REV_PAWN_MOVES: [SquareIndex<Bitboard>; 2] = precompute_rev_pawn_moves();
 pub const REV_PAWN_DBL_MOVES: [SquareIndex<Bitboard>; 2] = precompute_rev_pawn_dbl_moves();
 pub const REV_PAWN_ATTACKS: [SquareIndex<Bitboard>; 2] = precompute_rev_pawn_attacks();
+/*
+ * Indexed by file, or 8 if no en passant is possible
+ */
 pub const REV_PAWN_EP_ATTACKS: [[SquareIndex<Bitboard>; 9]; 2] = precompute_rev_pawn_ep_attacks();
 
 const fn precompute_rev_pawn_ep_attacks() -> [[SquareIndex<Bitboard>; 9]; 2] {
@@ -254,7 +259,7 @@ const fn precompute_rev_pawn_ep_attacks() -> [[SquareIndex<Bitboard>; 9]; 2] {
                 pat |= bb.0
             }
             let idx = Bitboard::at(x_target as u8, y_target as u8).to_index();
-            rev_attacks[color as usize][(x_target + 1) as usize].0[idx] = Bitboard(pat)
+            rev_attacks[color as usize][x_target as usize].0[idx] = Bitboard(pat)
         })
     });
     rev_attacks

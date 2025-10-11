@@ -2,7 +2,7 @@
 use std::io::{BufRead, Write};
 
 use args::{print_usage, Args};
-use chess_for_crabs::{bitboard::Bitboard, patterns::KNIGHT_ATTACKS, piece::Color, *};
+use chess_for_crabs::{moves::Move, piece::Piece, *};
 use fen;
 use game::Game;
 use moves::AlgebraicMove;
@@ -30,48 +30,70 @@ fn try_read<T, F: Fn(&str) -> Result<T, &str>>(
     }
 }
 
-fn play_from(mut game: Game) {
+enum Command {
+    Move(AlgebraicMove),
+    Quit,
+    ShowMoves(Piece),
+}
+impl Command {
+    fn parse(s: &str) -> Result<Command, &str> {
+        Ok(if let Some(alg) = AlgebraicMove::parse(s) {
+            Command::Move(alg)
+        } else {
+            match s.as_bytes() {
+                [b':', b'q'] => Command::Quit,
+                [b':', b'm', piece] => {
+                    if let Some(piece) = Piece::from_algebraic(*piece as char) {
+                        Command::ShowMoves(piece)
+                    } else {
+                        return Err("Invalid piece");
+                    }
+                }
+                _ => return Err("I cannot parse that"),
+            }
+        })
+    }
+}
+
+fn display(game: &Game) {
+    println!("{}\n", game.board.fen());
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
-    let mut buffer = String::new();
-
-    println!("{:?}", KNIGHT_ATTACKS[Bitboard::at(2, 2)]);
-    loop {
-        println!("{}", game.board.fen());
-        writeln!(&mut out, "").unwrap();
-        game.board.display(&mut out).unwrap();
-        for color in piece::Color::list() {
-            if (game.board[King] & game.board[color.opponent()]).is_empty() {
-                println!("{color} wins!");
-                return;
-            }
+    game.board.display(&mut out).unwrap();
+    for color in piece::Color::list() {
+        if (game.board[King] & game.board[color.opponent()]).is_empty() {
+            println!("{color} wins!");
+            return;
         }
-        game.board.for_each_pre_legal_move(&|mv| {
-            /*
-            println!("MOVE:");
-            println!("{mv:?}");
-*/
-            if let Some(alg) = game.board.to_algebraic(mv) {
-                println!("{alg}");
-            } else {
-                println!("ERROR: move is not algebraic");
-            }
-        });
-        let (alg, mv) = try_read(&mut buffer, |s| {
-            let alg = if let Some(alg) = AlgebraicMove::parse(s) {
-                alg
-            } else {
-                return Err("I cannot parse that");
-            };
-            let mv = match game.board.is_legal(&alg) {
-                Ok(mv) => mv,
-                Err(err) => return Err(err.as_str()),
-            };
-            Ok((alg, mv))
-        })
-        .unwrap();
-        game.make_move(&alg, &mv);
-        println!("{}", game.log);
+    }
+}
+
+fn play_from(mut game: Game) {
+    let mut buffer = String::new();
+    display(&game);
+
+    loop {
+        let cmd = try_read(&mut buffer, Command::parse).unwrap();
+        match cmd {
+            Command::Move(alg) => match game.board.is_legal(&alg) {
+                Ok(mv) => {
+                    game.make_move(&alg, &mv);
+                    println!("{}", game.log);
+                    display(&game)
+                },
+                Err(err) => println!("{}", err.as_str()),
+            },
+            Command::Quit => return,
+            Command::ShowMoves(piece) => {
+                game.board.for_each_piece_move(piece, &|mv| {
+                    if let Some(alg) = game.board.to_algebraic(mv) {
+                        println!("{alg}")
+                    } else {
+                        println!("Non-algebraic: {mv:?}")
+                    }
+                })
+            },
+        }
     }
 }
 

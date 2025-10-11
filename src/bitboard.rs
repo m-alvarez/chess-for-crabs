@@ -126,8 +126,8 @@ impl Bitboard {
     }
 
     pub const fn to_index(self) -> usize {
+        debug_assert!(self.0.count_ones() == 1);
         let result = self.0.ilog2() as usize;
-        assert!(Bitboard::of_index(result).0 == self.0);
         result
     }
 

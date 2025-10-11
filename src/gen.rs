@@ -80,7 +80,6 @@ impl Board {
         if (mv_tgt & !self.occupancy()).is_populated() {
             // Check whether we've reached the last rank
             let pieces: &[Piece] = if (mv_tgt & (LINE_AT_Y[0] | LINE_AT_Y[7])).is_populated() {
-                println!("MOVE TARGET: {:b}", mv_tgt.0);
                 &[Piece::Knight, Piece::Bishop, Piece::Rook, Piece::Queen]
             } else {
                 &[Piece::Pawn]
@@ -109,14 +108,14 @@ impl Board {
         let cap_tgt = PAWN_ATTACKS[self.player as usize][pos];
         // At most 2 captures; one on each side
         for tgt in (cap_tgt & self[self.player.opponent()]).occupied().take(2) {
+            println!("CAP!!");
             process_move(Move::Simple(SimpleMove {
                 delete: pos | tgt,
                 piece: Piece::Pawn,
                 add: tgt,
             }))
         }
-        // TODO: Get rid of this nonsensical en passant indexing
-        let ep_info = PAWN_EP_INFO[self.player as usize][(8 - self.en_passant.leading_zeros()) as usize];
+        let ep_info = PAWN_EP_INFO[self.player as usize][self.en_passant as usize];
         // I can't see a way to do e.p. without an extra conditional
         if (ep_info.source_squares & pos).is_populated() {
             process_move(Move::Simple(SimpleMove {
@@ -129,7 +128,7 @@ impl Board {
 
     pub fn for_each_pawn_move(&self, process_move: &impl Fn(Move)) {
         for pawn_pos in (self[self.player] & self[Piece::Pawn]).occupied() {
-            self.for_each_pawn_advance(pawn_pos, process_move);
+            //self.for_each_pawn_advance(pawn_pos, process_move);
             self.for_each_pawn_capture(pawn_pos, process_move);
         }
     }
@@ -195,6 +194,16 @@ impl Board {
                     add: tgt,
                 }))
             }
+        }
+    }
+    pub fn for_each_piece_move(&self, piece: Piece, process_move: &impl Fn(Move)) {
+        match piece {
+            Piece::Pawn => self.for_each_pawn_move(process_move),
+            Piece::Knight => self.for_each_knight_move(process_move),
+            Piece::Bishop => self.for_each_bishop_move(process_move),
+            Piece::Rook => self.for_each_rook_move(process_move),
+            Piece::Queen => self.for_each_queen_move(process_move),
+            Piece::King => self.for_each_king_move(process_move),
         }
     }
     // I can't come up with a way of abstracting this that's not potentially hard to
