@@ -11,3 +11,4 @@ pub mod move_log;
 pub mod moves;
 pub mod patterns;
 pub mod piece;
+pub mod search;
