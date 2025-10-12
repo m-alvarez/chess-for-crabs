@@ -1,3 +1,4 @@
+#![cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
 #![feature(stdarch_x86_avx512)]
 #![feature(pointer_is_aligned_to)]
 #[macro_use]

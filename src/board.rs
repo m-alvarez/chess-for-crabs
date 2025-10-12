@@ -118,50 +118,41 @@ impl Board {
         self[Black] | self[White]
     }
 
-   //#[inline(always)]
     pub fn apply_simple(&self, mv: &SimpleMove) -> Board {
-        use std::arch::x86_64::*;
-        return Board {
-            bitboards: Bitboards(unsafe {
-                let init_vec = _mm512_load_epi64(self.bitboards.0.as_ptr() as *const i64);
-                let del_vec = _mm512_set1_epi64(mv.delete.0 as i64);
-                let deleted_vec = _mm512_andnot_epi64(del_vec, init_vec);
-                let mut result: [Bitboard; 8] = [Bitboard::empty(); 8];
-                _mm512_store_si512(result.as_mut_ptr() as *mut __m512i, deleted_vec);
-                result[2 + mv.piece as usize] |= mv.add;
-                result[self.player as usize] |= mv.add;
-                result
-            }),
-            player: self.player.opponent(),
-            half_moves: self.half_moves + 1,
-            castling_rights: self.castling_rights,
-            en_passant: if mv.piece != Piece::Pawn {
-                NO_EN_PASSANT
-            } else {
-                (match self.player {
-                    Black => (((mv.add.0 >> 16) & mv.delete.0) >> 8) as u8,
-                    White => (((mv.add.0 << 16) & mv.delete.0) >> 48) as u8,
-                }).leading_zeros() as u8
-            },
+        // This will be SIMD eventually, but it's hard to make more efficient
+        let mut bitboards = Bitboards([
+            self.bitboards.0[0] & !mv.delete,
+            self.bitboards.0[1] & !mv.delete,
+            self.bitboards.0[2] & !mv.delete,
+            self.bitboards.0[3] & !mv.delete,
+            self.bitboards.0[4] & !mv.delete,
+            self.bitboards.0[5] & !mv.delete,
+            self.bitboards.0[6] & !mv.delete,
+            self.bitboards.0[7] & !mv.delete,
+        ]);
+/*
+        for bb in new.bitboards.0.iter_mut() {
+            *bb &= !mv.delete
+        }
+*/
+        bitboards.0[2 + mv.piece as usize] |= mv.add;
+        bitboards.0[self.player as usize] |= mv.add;
+        // TODO: branchless version is possible via shifts
+        let en_passant = if mv.piece == Piece::Pawn {
+            (match self.player {
+                Black => (((mv.add.0 >> 16) & mv.delete.0) >> 8) as u8,
+                White => (((mv.add.0 << 16) & mv.delete.0) >> 48) as u8,
+            }).leading_zeros() as u8
+        } else {
+            NO_EN_PASSANT
         };
-        /*
-                // This will be SIMD eventually
-                let mut new = *self;
-                for bb in new.bitboards.iter_mut() {
-                    *bb &= !mv.delete
-                }
-                new[mv.piece] |= mv.add;
-                new[self.player] |= mv.add;
-                new.player = self.player.opponent();
-                let new_pawn = new[Pawn] & !self[Pawn];
-                // TODO: branchless version is possible via shifts
-                let ep_bitmap = match self.player {
-                    Black => (((new_pawn.0 >> 16) & mv.delete.0) >> 8) as u8,
-                    White => (((new_pawn.0 << 16) & mv.delete.0) >> 48) as u8,
-                };
-                new.en_passant = ep_bitmap.leading_zeros() as u8;
-                new
-        */
+        Board {
+            bitboards,
+            player: self.player.opponent(),
+            en_passant,
+            castling_rights: self.castling_rights,
+            half_moves: self.half_moves + 1,
+        }
     }
 
     pub fn apply_castle(&self, info: &CastleInfo) -> Board {
