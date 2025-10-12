@@ -1,3 +1,4 @@
+#![feature(stdarch_x86_avx512)]
 #[macro_use]
 pub mod utils;
 pub mod args;

@@ -4,3 +4,23 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+
+[[bin]]
+name = "chess-for-crabs"
+path = "src/bin/chess_for_crabs.rs"
+
+[[bin]]
+name = "eval-bench"
+path = "bench/eval_bench.rs"
+
+[profile.my-bench]
+inherits = "release"
+debug = 2
+opt-level = 3
+overflow-checks = false
+
+[profile.my-release]
+inherits = "release"
+debug = 0
+opt-level = 3
+overflow-checks = false

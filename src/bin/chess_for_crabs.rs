@@ -76,7 +76,7 @@ fn display(game: &Game) {
 }
 
 fn play_from(mut game: Game) {
-    let mut search = IDAB { evaluator: MaterialCount() };
+    let mut search = IDAB::new(MaterialCount());
     let mut buffer = String::new();
     display(&game);
 
@@ -101,7 +101,7 @@ fn play_from(mut game: Game) {
                 }
             }),
             Command::Eval => {
-                let evaluation = search.evaluate(game.board, game.board.player, 2, 0, 0);
+                let evaluation = search.evaluate(game.board, game.board.player, 6, 0, 0);
                 println!("{evaluation}");
             },
             Command::Undo => {
