@@ -1,4 +1,5 @@
 #![feature(stdarch_x86_avx512)]
+#![feature(pointer_is_aligned_to)]
 #[macro_use]
 pub mod utils;
 pub mod args;

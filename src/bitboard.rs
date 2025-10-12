@@ -2,8 +2,6 @@ use std::fmt::{Debug, Formatter};
 use std::ops::{BitAnd, BitOr, BitXor, Not, Sub};
 use std::ops::{BitAndAssign, BitOrAssign, BitXorAssign};
 
-use std::arch::x86_64::_popcnt64;
-
 use crate::piece::{Color, Piece};
 use Color::*;
 use Piece::*;
@@ -132,7 +130,7 @@ impl Bitboard {
     }
 
     pub const fn of_index(idx: usize) -> Self {
-        assert!(idx < 64);
+        debug_assert!(idx < 64);
         Bitboard(1 << idx)
     }
 
@@ -182,13 +180,22 @@ impl Bitboard {
         self.0 == 0
     }
 
-    pub fn popcnt(self) -> i32 {
-        unsafe { _popcnt64(self.0 as i64) }
+    #[inline(always)]
+    pub fn popcnt(self) -> i64 {
+        // For some reason, rustc will not inline the call to the corresponding intrinsic
+        let mut pop: i64;
+        unsafe {
+        std::arch::asm!(
+            "popcnt {pop}, {x}",
+            pop = out(reg) pop,
+            x = in(reg) self.0
+        ) };
+        pop
     }
 
     pub const fn at(x: u8, y: u8) -> Bitboard {
-        assert!(x < 8);
-        assert!(y < 8);
+        debug_assert!(x < 8);
+        debug_assert!(y < 8);
         Bitboard(1 << (63 - x - y * 8))
     }
 

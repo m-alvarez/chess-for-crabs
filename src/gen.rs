@@ -167,6 +167,7 @@ impl Board {
             }
         }
     }
+
     pub fn for_each_queen_move(&self, process_move: &mut impl FnMut(SimpleMove)) {
         for queen_pos in (self[self.player] & self[Piece::Queen]).occupied() {
             for tgt in (self.queen_reach(queen_pos) & !self[self.player]).occupied() {
@@ -178,6 +179,7 @@ impl Board {
             }
         }
     }
+
     pub fn for_each_king_move(&self, process_move: &mut impl FnMut(SimpleMove)) {
         for king_pos in (self[self.player] & self[Piece::King]).occupied() {
             for tgt in (self.king_reach(king_pos) & !self[self.player]).occupied() {
@@ -189,6 +191,7 @@ impl Board {
             }
         }
     }
+
     pub fn for_each_pre_legal_castling_move(&self, process_move: &mut impl FnMut(Move)) {
         if self.short_castling_allowed(self.player) {
             if let Ok(mv) = self.castle_short() {
@@ -202,7 +205,11 @@ impl Board {
         }
     }
 
-    pub fn for_each_piece_simple_move(&self, piece: Piece, process_move: &mut impl FnMut(SimpleMove)) {
+    pub fn for_each_piece_simple_move(
+        &self,
+        piece: Piece,
+        process_move: &mut impl FnMut(SimpleMove),
+    ) {
         match piece {
             Piece::Pawn => self.for_each_pawn_move(process_move),
             Piece::Knight => self.for_each_knight_move(process_move),
@@ -222,5 +229,10 @@ impl Board {
         self.for_each_rook_move(process_move);
         self.for_each_queen_move(process_move);
         self.for_each_king_move(process_move);
+    }
+
+    pub fn for_each_pre_legal_move(&self, process_move: &mut impl FnMut(Move)) {
+        self.for_each_pre_legal_simple_move(&mut |s| process_move(Move::Simple(s)));
+        self.for_each_pre_legal_castling_move(process_move);
     }
 }

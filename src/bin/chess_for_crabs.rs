@@ -2,13 +2,13 @@
 use std::io::{BufRead, Write};
 
 use args::{print_usage, Args};
-use chess_for_crabs::*;
+use chess_for_crabs::{moves::Move, *};
 use eval::MaterialCount;
-use piece::Piece;
-use search::IDAB;
 use fen;
 use game::Game;
 use moves::AlgebraicMove;
+use piece::Piece;
+use search::IDAB;
 
 use piece::Piece::*;
 
@@ -92,8 +92,9 @@ fn play_from(mut game: Game) {
                 Err(err) => println!("{}", err.as_str()),
             },
             Command::Quit => return,
-            Command::ShowMoves(piece) => game.board.for_each_piece_move(piece, &mut |mv| {
-                if let Some(alg) = game.board.to_algebraic(mv) {
+            Command::ShowMoves(piece) => game.board.for_each_piece_simple_move(piece, &mut |mv| {
+                // TODO: print castlings
+                if let Some(alg) = game.board.to_algebraic(Move::Simple(mv)) {
                     print!("{alg}, ")
                 } else {
                     println!("\nNon-algebraic move found");
@@ -103,7 +104,7 @@ fn play_from(mut game: Game) {
             Command::Eval => {
                 let evaluation = search.evaluate(game.board, game.board.player, 6, 0, 0);
                 println!("{evaluation}");
-            },
+            }
             Command::Undo => {
                 game.undo_last_move();
                 println!("{}", game.log);

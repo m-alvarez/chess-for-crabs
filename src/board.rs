@@ -10,9 +10,14 @@ use Piece::*;
 use crate::patterns::*;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
+// Alignment does not achieve any performance gains, but it might on a different arch
+#[repr(C, align(64))]
+// First two entries are color boards, then piece boards
+pub struct Bitboards(pub [Bitboard; 8]);
+
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Board {
-    // First two entries are color boards, then piece boards
-    pub bitboards: [Bitboard; 8],
+    pub bitboards: Bitboards,
     pub player: Color,
     pub half_moves: u8,
     pub castling_rights: u8,
@@ -83,7 +88,7 @@ const SHORT_CASTLE_INFO: [CastleInfo; 2] = [
 impl Board {
     pub fn initial() -> Board {
         let mut b = Board {
-            bitboards: [Bitboard::empty(); 8],
+            bitboards: Bitboards([Bitboard::empty(); 8]),
             player: White,
             half_moves: 0,
             castling_rights: 0b1111,
@@ -101,7 +106,7 @@ impl Board {
 
     pub fn empty() -> Board {
         Board {
-            bitboards: [Bitboard::empty(); 8],
+            bitboards: Bitboards([Bitboard::empty(); 8]),
             player: White,
             half_moves: 0,
             castling_rights: 0,
@@ -113,19 +118,20 @@ impl Board {
         self[Black] | self[White]
     }
 
+   //#[inline(always)]
     pub fn apply_simple(&self, mv: &SimpleMove) -> Board {
         use std::arch::x86_64::*;
         return Board {
-            bitboards: unsafe {
-                let init_vec = _mm512_loadu_epi64(self.bitboards.as_ptr() as *const i64);
+            bitboards: Bitboards(unsafe {
+                let init_vec = _mm512_load_epi64(self.bitboards.0.as_ptr() as *const i64);
                 let del_vec = _mm512_set1_epi64(mv.delete.0 as i64);
                 let deleted_vec = _mm512_andnot_epi64(del_vec, init_vec);
                 let mut result: [Bitboard; 8] = [Bitboard::empty(); 8];
-                _mm512_storeu_si512(result.as_mut_ptr() as *mut __m512i, deleted_vec);
+                _mm512_store_si512(result.as_mut_ptr() as *mut __m512i, deleted_vec);
                 result[2 + mv.piece as usize] |= mv.add;
                 result[self.player as usize] |= mv.add;
                 result
-            },
+            }),
             player: self.player.opponent(),
             half_moves: self.half_moves + 1,
             castling_rights: self.castling_rights,
@@ -480,22 +486,22 @@ impl Display for Board {
 impl Index<Piece> for Board {
     type Output = Bitboard;
     fn index(&self, index: Piece) -> &Bitboard {
-        &self.bitboards[2 + index as usize]
+        &self.bitboards.0[2 + index as usize]
     }
 }
 impl IndexMut<Piece> for Board {
     fn index_mut(&mut self, index: Piece) -> &mut Bitboard {
-        &mut self.bitboards[2 + index as usize]
+        &mut self.bitboards.0[2 + index as usize]
     }
 }
 impl Index<Color> for Board {
     type Output = Bitboard;
     fn index(&self, index: Color) -> &Bitboard {
-        &self.bitboards[index as usize]
+        &self.bitboards.0[index as usize]
     }
 }
 impl IndexMut<Color> for Board {
     fn index_mut(&mut self, index: Color) -> &mut Bitboard {
-        &mut self.bitboards[index as usize]
+        &mut self.bitboards.0[index as usize]
     }
 }
