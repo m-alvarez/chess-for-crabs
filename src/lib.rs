@@ -1,6 +1,6 @@
-#![cfg(all(target_arch = "x86_64", target_feature = "avx512f"))]
 #![feature(stdarch_x86_avx512)]
 #![feature(pointer_is_aligned_to)]
+#![feature(step_trait)]
 #[macro_use]
 pub mod utils;
 pub mod args;
@@ -15,3 +15,4 @@ pub mod moves;
 pub mod patterns;
 pub mod piece;
 pub mod search;
+pub mod types;

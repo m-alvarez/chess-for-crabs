@@ -92,15 +92,18 @@ fn play_from(mut game: Game) {
                 Err(err) => println!("{}", err.as_str()),
             },
             Command::Quit => return,
-            Command::ShowMoves(piece) => game.board.for_each_piece_simple_move(piece, &mut |mv| {
-                // TODO: print castlings
-                if let Some(alg) = game.board.to_algebraic(Move::Simple(mv)) {
-                    print!("{alg}, ")
-                } else {
-                    println!("\nNon-algebraic move found");
-                    println!("{:?}", mv);
+            Command::ShowMoves(piece) => {
+                let mut moves = Vec::with_capacity(32);
+                game.board.piece_moves(piece, &mut moves);
+                for mv in moves {
+                    if let Some(alg) = game.board.to_algebraic(mv) {
+                        print!("{alg}, ")
+                    } else {
+                        println!("\nNon-algebraic move found");
+                        println!("{:?}", mv);
+                    }
                 }
-            }),
+            }
             Command::Eval => {
                 let evaluation = search.evaluate(game.board, game.board.player, 6, 0, 0);
                 println!("{evaluation}");

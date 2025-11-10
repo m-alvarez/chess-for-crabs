@@ -1,10 +1,18 @@
 use std::cmp::{max, min};
 
-use crate::{board::Board, eval::Evaluator, piece::Color};
+use crate::{board::Board, eval::Evaluator, moves::Move, piece::Color};
+
+const MAX_MOVES: usize = 28 * (1 + 8) // Max possible queen moves
+    + 14 * 2 // Max possible rook moves
+    + 14 * 2 // Max possible bishop moves
+    + 8 * 2 // Max possible knight moves
+    + (9 + 2) // Max possible king moves
+;
 
 pub struct IDAB<Ev: Evaluator> {
     pub evaluator: Ev,
     pub searched_positions: i64,
+    pub move_buffers: Vec<[Move; MAX_MOVES]>,
 }
 
 impl<Ev: Evaluator> IDAB<Ev> {
@@ -12,6 +20,7 @@ impl<Ev: Evaluator> IDAB<Ev> {
         IDAB {
             evaluator,
             searched_positions: 0,
+            move_buffers: Vec::new(),
         }
     }
 
@@ -28,20 +37,9 @@ impl<Ev: Evaluator> IDAB<Ev> {
             self.evaluator.evaluate(&pos)
         } else {
             let mut best = None;
-            pos.for_each_pre_legal_simple_move(&mut |mv| {
-                let new_pos = pos.apply_simple(&mv);
-                let score = self.evaluate(new_pos, player.opponent(), depth - 1, alpha, beta);
-                if let Some(best_score) = best {
-                    if player == Color::White {
-                        best = Some(max(score, best_score))
-                    } else {
-                        best = Some(min(score, best_score))
-                    }
-                } else {
-                    best = Some(score)
-                }
-            });
-            pos.for_each_pre_legal_castling_move(&mut |mv| {
+            let mut moves = Vec::with_capacity(32);
+            pos.pre_legal_moves(&mut moves);
+            for mv in moves {
                 let new_pos = pos.apply(&mv);
                 let score = self.evaluate(new_pos, player.opponent(), depth - 1, alpha, beta);
                 if let Some(best_score) = best {
@@ -53,7 +51,7 @@ impl<Ev: Evaluator> IDAB<Ev> {
                 } else {
                     best = Some(score)
                 }
-            });
+            }
             match best {
                 Some(b) => b,
                 None => {
