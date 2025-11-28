@@ -29,43 +29,68 @@ impl<Ev: Evaluator> IDAB<Ev> {
         pos: Board,
         player: Color,
         depth: u64,
-        alpha: i64,
-        beta: i64,
+        mut alpha: i64,
+        mut beta: i64,
     ) -> i64 {
         self.searched_positions += 1;
         if depth == 0 {
             self.evaluator.evaluate(&pos)
         } else {
-            let mut best = None;
+            let mut best = match player {
+                Color::Black => i64::max_value(),
+                Color::White => i64::min_value(),
+            };
             let mut moves = Vec::with_capacity(32);
             pos.pre_legal_moves(&mut moves);
-            for mv in moves {
+            for mv in moves.iter() {
                 let new_pos = pos.apply(&mv);
                 let score = self.evaluate(new_pos, player.opponent(), depth - 1, alpha, beta);
-                if let Some(best_score) = best {
-                    if player == Color::White {
-                        best = Some(max(score, best_score))
-                    } else {
-                        best = Some(min(score, best_score))
-                    }
+
+                if player == Color::White {
+                    best = max(score, best);
+                    if best >= beta {
+                        break;
+                    };
+                    alpha = max(alpha, score)
                 } else {
-                    best = Some(score)
+                    best = min(score, best);
+                    if best <= alpha {
+                        break;
+                    };
+                    beta = min(beta, score)
                 }
             }
-            match best {
-                Some(b) => b,
-                None => {
-                    debug_assert!(!pos.in_check(player.opponent()));
-                    if pos.in_check(player) {
-                        match player {
-                            Color::Black => i64::max_value(),
-                            Color::White => i64::min_value(),
-                        }
-                    } else {
-                        0
-                    }
+            best
+        }
+    }
+
+    /* Just for debugging purposes */
+    pub fn evaluate_naive(&mut self, pos: Board, player: Color, depth: u64) -> i64 {
+        self.searched_positions += 1;
+        if depth == 0 {
+            self.evaluator.evaluate(&pos)
+        } else {
+            let mut best = match player {
+                Color::Black => i64::max_value(),
+                Color::White => i64::min_value(),
+            };
+            let mut moves = Vec::with_capacity(32);
+            pos.pre_legal_moves(&mut moves);
+            for mv in moves.iter() {
+                let new_pos = pos.apply(&mv);
+                let score = self.evaluate_naive(new_pos, player.opponent(), depth - 1);
+
+                if player == Color::White {
+                    best = max(score, best);
+                } else {
+                    best = min(score, best);
                 }
             }
+            let eval_ab = self.evaluate(pos, player, depth, i64::min_value(), i64::max_value());
+            if eval_ab != best {
+                std::process::exit(-1);
+            }
+            best
         }
     }
 }

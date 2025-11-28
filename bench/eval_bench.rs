@@ -10,7 +10,7 @@ fn main() {
     let game = Game::new();
     let mut search = IDAB::new(MaterialCount());
     let start = SystemTime::now();
-    let eval = search.evaluate(game.board, game.board.player, 6, 0, 0);
+    let eval = search.evaluate(game.board, game.board.player, 8, i64::min_value(), i64::max_value());
     std::hint::black_box(eval);
     let end = SystemTime::now();
     let delta = end.duration_since(start).unwrap();
